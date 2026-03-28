@@ -50,29 +50,36 @@ func newCommitCommandWithDependencies(dependencies commitDependencies) *cobra.Co
 	options := commitOptions{}
 	command := &cobra.Command{
 		Use:   "commit",
-		Short: "Generate a commit message from staged changes",
+		Short: "Gera uma mensagem de commit a partir das mudancas staged",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runCommitCommand(cmd, dependencies, options)
 		},
 	}
 
-	command.Flags().BoolVar(&options.dryRun, "dry-run", false, "show the generated message without committing")
-	command.Flags().BoolVar(&options.yes, "yes", false, "create the commit without confirmation")
+	command.Flags().BoolVar(&options.dryRun, "dry-run", false, "mostra a mensagem gerada sem criar o commit")
+	command.Flags().BoolVar(&options.yes, "yes", false, "cria o commit sem pedir confirmacao")
 	return command
 }
 
 func runCommitCommand(command *cobra.Command, dependencies commitDependencies, options commitOptions) error {
 	service := app.NewCommitService(dependencies.gitRepository, dependencies.aiProvider)
-	result, err := service.GenerateCommit(app.GenerateCommitOptions{
+	selectedPaths, err := prepareCommitPaths(command, dependencies, options)
+	if err != nil {
+		return err
+	}
+
+	plans, err := service.PlanCommits(selectedPaths, app.GenerateCommitOptions{
 		Scope: dependencies.config.DefaultScope,
 	})
 	if err != nil {
 		return err
 	}
 
-	formattedOutput := ui.FormatCommitResult(result)
-	if _, err := fmt.Fprintf(command.OutOrStdout(), "%s\n", formattedOutput); err != nil {
-		return err
+	for index, plan := range plans {
+		formattedOutput := ui.FormatCommitPlan(index+1, len(plans), plan.Result)
+		if _, err := fmt.Fprintf(command.OutOrStdout(), "%s\n", formattedOutput); err != nil {
+			return err
+		}
 	}
 
 	if options.dryRun {
@@ -80,30 +87,95 @@ func runCommitCommand(command *cobra.Command, dependencies commitDependencies, o
 	}
 
 	if shouldSkipConfirmation(options, dependencies.config) {
-		return createCommit(command, dependencies.gitRepository, result.Message)
+		return createPlannedCommits(command, dependencies.gitRepository, plans)
 	}
 
-	confirmed, err := ui.ConfirmCommit(command.InOrStdin(), command.OutOrStdout())
+	confirmed, err := ui.ConfirmCommit(command.InOrStdin(), command.OutOrStdout(), "criar commits planejados?")
 	if err != nil {
 		return err
 	}
 	if !confirmed {
-		_, err = fmt.Fprintln(command.OutOrStdout(), "commit canceled")
+		_, err = fmt.Fprintln(command.OutOrStdout(), "commit cancelado")
 		return err
 	}
 
-	return createCommit(command, dependencies.gitRepository, result.Message)
+	return createPlannedCommits(command, dependencies.gitRepository, plans)
 }
 
 func shouldSkipConfirmation(options commitOptions, configuration commitConfig) bool {
 	return options.yes || configuration.AutoConfirm
 }
 
-func createCommit(command *cobra.Command, gitRepository interfaces.GitRepository, message string) error {
-	if err := gitRepository.Commit(message); err != nil {
-		return err
+func createPlannedCommits(command *cobra.Command, gitRepository interfaces.GitRepository, plans []app.CommitPlan) error {
+	for _, plan := range plans {
+		if err := gitRepository.CommitPaths(plan.Result.Message, plan.Result.Paths); err != nil {
+			return err
+		}
+
+		if _, err := fmt.Fprintf(command.OutOrStdout(), "commit criado: %s\n", strings.TrimSpace(plan.Result.Message)); err != nil {
+			return err
+		}
 	}
 
-	_, err := fmt.Fprintf(command.OutOrStdout(), "commit created: %s\n", strings.TrimSpace(message))
-	return err
+	return nil
+}
+
+func prepareCommitPaths(command *cobra.Command, dependencies commitDependencies, options commitOptions) ([]string, error) {
+	stagedPaths, err := dependencies.gitRepository.ListStagedFiles()
+	if err != nil {
+		return nil, err
+	}
+
+	changedPaths, err := dependencies.gitRepository.ListChangedFiles()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(changedPaths) > 0 {
+		if _, err := fmt.Fprintln(command.OutOrStdout(), ui.FormatChangedFiles(changedPaths)); err != nil {
+			return nil, err
+		}
+
+		confirmed, err := confirmStageChangedFiles(command, dependencies, options)
+		if err != nil {
+			return nil, err
+		}
+		if confirmed {
+			if err := dependencies.gitRepository.StageFiles(changedPaths); err != nil {
+				return nil, err
+			}
+			stagedPaths = append(stagedPaths, changedPaths...)
+		}
+	}
+
+	selectedPaths := uniquePaths(stagedPaths)
+	if len(selectedPaths) == 0 {
+		return nil, app.ErrEmptyDiff
+	}
+
+	return selectedPaths, nil
+}
+
+func confirmStageChangedFiles(command *cobra.Command, dependencies commitDependencies, options commitOptions) (bool, error) {
+	if shouldSkipConfirmation(options, dependencies.config) {
+		return false, nil
+	}
+
+	return ui.ConfirmCommit(command.InOrStdin(), command.OutOrStdout(), "adicionar arquivos em changes ao staged?")
+}
+
+func uniquePaths(paths []string) []string {
+	seenPaths := map[string]bool{}
+	result := make([]string, 0, len(paths))
+
+	for _, path := range paths {
+		if path == "" || seenPaths[path] {
+			continue
+		}
+
+		seenPaths[path] = true
+		result = append(result, path)
+	}
+
+	return result
 }
