@@ -3,13 +3,14 @@ package app
 import (
 	"errors"
 	"reflect"
+	"sort"
 	"strings"
 
 	domaincommit "github.com/ovitorvalente/git-loom/internal/domain/commit"
 	"github.com/ovitorvalente/git-loom/internal/interfaces"
 )
 
-var ErrEmptyDiff = errors.New("no staged changes found; run git add before gitloom commit")
+var ErrEmptyDiff = errors.New("nenhuma mudanca staged encontrada; execute git add antes de gitloom commit")
 
 type CommitService struct {
 	git interfaces.GitRepository
@@ -24,6 +25,11 @@ type CommitResult struct {
 	Diff    string
 	Message string
 	Commit  domaincommit.Model
+	Paths   []string
+}
+
+type CommitPlan struct {
+	Result CommitResult
 }
 
 func NewCommitService(gitRepository interfaces.GitRepository, aiProvider interfaces.AIProvider) CommitService {
@@ -38,11 +44,55 @@ func (service CommitService) GenerateCommit(options ...GenerateCommitOptions) (C
 	if err != nil {
 		return CommitResult{}, err
 	}
+
+	return service.generateFromDiff(diff, nil, firstCommitOptions(options))
+}
+
+func (service CommitService) GenerateCommitForPaths(paths []string, options ...GenerateCommitOptions) (CommitResult, error) {
+	diff, err := service.git.GetDiff(paths...)
+	if err != nil {
+		return CommitResult{}, err
+	}
+
+	return service.generateFromDiff(diff, paths, firstCommitOptions(options))
+}
+
+func (service CommitService) PlanCommits(paths []string, options ...GenerateCommitOptions) ([]CommitPlan, error) {
+	commitOptions := firstCommitOptions(options)
+	groupedPaths := map[string][]string{}
+
+	for _, path := range paths {
+		result, err := service.GenerateCommitForPaths([]string{path}, commitOptions)
+		if err != nil {
+			return nil, err
+		}
+
+		groupKey := buildGroupKey(result.Commit.Type, result.Commit.Scope)
+		groupedPaths[groupKey] = append(groupedPaths[groupKey], path)
+	}
+
+	plans := []CommitPlan{}
+	for _, group := range stableGroups(groupedPaths) {
+		for _, chunk := range chunkPaths(group, 4) {
+			result, err := service.GenerateCommitForPaths(chunk, commitOptions)
+			if err != nil {
+				return nil, err
+			}
+			plans = append(plans, CommitPlan{
+				Result: result,
+			})
+		}
+	}
+
+	return plans, nil
+}
+
+func (service CommitService) generateFromDiff(diff string, paths []string, options GenerateCommitOptions) (CommitResult, error) {
 	if strings.TrimSpace(diff) == "" {
 		return CommitResult{}, ErrEmptyDiff
 	}
 
-	model := buildCommitModel(diff, firstCommitOptions(options))
+	model := buildCommitModel(diff, options)
 	message, err := service.resolveMessage(diff, model)
 	if err != nil {
 		return CommitResult{}, err
@@ -52,6 +102,7 @@ func (service CommitService) GenerateCommit(options ...GenerateCommitOptions) (C
 		Diff:    diff,
 		Message: message,
 		Commit:  model,
+		Paths:   append([]string(nil), paths...),
 	}, nil
 }
 
@@ -85,10 +136,17 @@ func isNilAIProvider(provider interfaces.AIProvider) bool {
 }
 
 func buildCommitModel(diff string, options GenerateCommitOptions) domaincommit.Model {
+	analysis := domaincommit.AnalyzeDiff(diff, domaincommit.ClassifyCommit(diff))
+	scope := strings.TrimSpace(options.Scope)
+	if scope == "" {
+		scope = analysis.Scope
+	}
+
 	return domaincommit.Model{
 		Type:        domaincommit.ClassifyCommit(diff),
-		Scope:       strings.TrimSpace(options.Scope),
-		Description: buildDescription(diff),
+		Scope:       scope,
+		Description: analysis.Description,
+		Body:        analysis.Body,
 	}
 }
 
@@ -100,22 +158,40 @@ func firstCommitOptions(options []GenerateCommitOptions) GenerateCommitOptions {
 	return options[0]
 }
 
-func buildDescription(diff string) string {
-	firstLine := extractFirstLine(diff)
-	if firstLine != "" {
-		return firstLine
-	}
-
-	return "update repository changes"
+func buildGroupKey(commitType domaincommit.Type, scope string) string {
+	return string(commitType) + "|" + scope
 }
 
-func extractFirstLine(diff string) string {
-	for _, line := range strings.Split(diff, "\n") {
-		trimmedLine := strings.TrimSpace(line)
-		if trimmedLine != "" {
-			return trimmedLine
-		}
+func stableGroups(groupedPaths map[string][]string) [][]string {
+	keys := make([]string, 0, len(groupedPaths))
+	for key := range groupedPaths {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	result := make([][]string, 0, len(keys))
+	for _, key := range keys {
+		group := append([]string(nil), groupedPaths[key]...)
+		sort.Strings(group)
+		result = append(result, group)
 	}
 
-	return ""
+	return result
+}
+
+func chunkPaths(paths []string, chunkSize int) [][]string {
+	if len(paths) == 0 {
+		return nil
+	}
+
+	chunks := [][]string{}
+	for start := 0; start < len(paths); start += chunkSize {
+		end := start + chunkSize
+		if end > len(paths) {
+			end = len(paths)
+		}
+		chunks = append(chunks, append([]string(nil), paths[start:end]...))
+	}
+
+	return chunks
 }
