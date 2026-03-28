@@ -55,6 +55,15 @@ Se um commit precisa de explicação longa, ele está errado.
 
 ---
 
+🌎 Idioma Obrigatório
+🇧🇷 Todos os commits DEVEM ser escritos em português (pt-BR)
+✔️ Correto:
+feat(auth): adicionar autenticação com jwt
+❌ Incorreto:
+feat(auth): add jwt authenticati
+
+---
+
 # 🧾 Padrão de Commit
 
 Seguimos o padrão Conventional Commits
