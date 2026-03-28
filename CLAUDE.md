@@ -17,10 +17,10 @@ gitloom is a CLI tool that automates Git workflows by analyzing code changes, ge
 
 Utilize as seguintes habilidades para desenvolver o projeto:
 
-- ~/.agents/skills/golang-pro
-- ~/.agents/skills/clean-architecture
-- ~/.agents/skills/clean-code
-- ~/.agents/skills/domain-driven-design
+- /home/ovitorvalente/.agents/skills/golang-pro
+- /home/ovitorvalente/.agents/skills/clean-architecture
+- /home/ovitorvalente/.agents/skills/clean-code
+- /home/ovitorvalente/.agents/skills/domain-driven-design
 
 ---
 
