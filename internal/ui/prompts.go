@@ -7,8 +7,8 @@ import (
 	"strings"
 )
 
-func ConfirmCommit(input io.Reader, output io.Writer) (bool, error) {
-	if _, err := fmt.Fprint(output, "create commit? [y/N]: "); err != nil {
+func ConfirmCommit(input io.Reader, output io.Writer, question string) (bool, error) {
+	if _, err := fmt.Fprintf(output, "%s [y/N]: ", question); err != nil {
 		return false, err
 	}
 
