@@ -4,6 +4,18 @@ import "strings"
 
 func ClassifyCommit(diff string) Type {
 	normalizedDiff := strings.ToLower(diff)
+	if hasDocsSignal(normalizedDiff) {
+		return TypeDocs
+	}
+	if hasTestSignal(normalizedDiff) {
+		return TypeTest
+	}
+	if hasFeatureFileSignal(normalizedDiff) {
+		return TypeFeat
+	}
+	if hasRefactorFileSignal(normalizedDiff) {
+		return TypeRefactor
+	}
 	if hasFixSignal(normalizedDiff) {
 		return TypeFix
 	}
@@ -34,6 +46,22 @@ func hasRefactorSignal(content string) bool {
 
 func hasFeatureSignal(content string) bool {
 	return containsAny(content, "feat", "add", "create", "implement", "introduce", "support", "enable")
+}
+
+func hasFeatureFileSignal(content string) bool {
+	return strings.Contains(content, "new file mode") && containsAny(content, ".go", ".ts", ".tsx", ".js", ".jsx")
+}
+
+func hasRefactorFileSignal(content string) bool {
+	return strings.Contains(content, "diff --git") && containsAny(content, ".go", ".ts", ".tsx", ".js", ".jsx")
+}
+
+func hasDocsSignal(content string) bool {
+	return containsAny(content, ".md", "readme", "docs", "document", "documentation")
+}
+
+func hasTestSignal(content string) bool {
+	return containsAny(content, "_test.go", "test", "spec", "coverage")
 }
 
 func containsAny(content string, keywords ...string) bool {

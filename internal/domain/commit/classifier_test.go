@@ -43,7 +43,12 @@ func TestClassifyCommit(t *testing.T) {
 		{
 			name:     "returns chore for documentation updates",
 			diff:     "docs: update installation guide",
-			expected: TypeChore,
+			expected: TypeDocs,
+		},
+		{
+			name:     "returns test for test changes",
+			diff:     "add commit_service_test.go coverage",
+			expected: TypeTest,
 		},
 	}
 
