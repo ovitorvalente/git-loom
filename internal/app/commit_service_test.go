@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	domaincommit "github.com/ovitorvalente/git-loom/internal/domain/commit"
@@ -28,34 +29,34 @@ func TestCommitServiceGenerateCommit(t *testing.T) {
 		{
 			name: "returns generated message without ai provider",
 			gitRepository: &mocks.GitRepository{
-				GetDiffFunc: func() (string, error) {
-					return "add commit workflow support", nil
+				GetDiffFunc: func(paths ...string) (string, error) {
+					return "diff --git a/internal/cli/commit.go b/internal/cli/commit.go\nnew file mode 100644\n", nil
 				},
 			},
 			expectedType:      domaincommit.TypeFeat,
-			expectedMessage:   "feat: add commit workflow support",
-			expectedDiff:      "add commit workflow support",
+			expectedMessage:   "feat(cli): adicionar commit\n\n- adicionado commit",
+			expectedDiff:      "diff --git a/internal/cli/commit.go b/internal/cli/commit.go\nnew file mode 100644\n",
 			expectedAIInvokes: 0,
 		},
 		{
 			name: "applies configured scope",
 			gitRepository: &mocks.GitRepository{
-				GetDiffFunc: func() (string, error) {
-					return "add commit workflow support", nil
+				GetDiffFunc: func(paths ...string) (string, error) {
+					return "diff --git a/internal/app/commit_service.go b/internal/app/commit_service.go\nindex 1111111..2222222 100644\n", nil
 				},
 			},
 			options: GenerateCommitOptions{
 				Scope: "core",
 			},
-			expectedType:      domaincommit.TypeFeat,
-			expectedMessage:   "feat(core): add commit workflow support",
-			expectedDiff:      "add commit workflow support",
+			expectedType:      domaincommit.TypeRefactor,
+			expectedMessage:   "refactor(core): refatorar commit service\n\n- atualizado commit service",
+			expectedDiff:      "diff --git a/internal/app/commit_service.go b/internal/app/commit_service.go\nindex 1111111..2222222 100644\n",
 			expectedAIInvokes: 0,
 		},
 		{
 			name: "returns ai generated message when available",
 			gitRepository: &mocks.GitRepository{
-				GetDiffFunc: func() (string, error) {
+				GetDiffFunc: func(paths ...string) (string, error) {
 					return "fix generator regression", nil
 				},
 			},
@@ -76,7 +77,7 @@ func TestCommitServiceGenerateCommit(t *testing.T) {
 		{
 			name: "propagates git diff errors",
 			gitRepository: &mocks.GitRepository{
-				GetDiffFunc: func() (string, error) {
+				GetDiffFunc: func(paths ...string) (string, error) {
 					return "", diffError
 				},
 			},
@@ -85,7 +86,7 @@ func TestCommitServiceGenerateCommit(t *testing.T) {
 		{
 			name: "returns error when diff is empty",
 			gitRepository: &mocks.GitRepository{
-				GetDiffFunc: func() (string, error) {
+				GetDiffFunc: func(paths ...string) (string, error) {
 					return " \n\t", nil
 				},
 			},
@@ -94,8 +95,8 @@ func TestCommitServiceGenerateCommit(t *testing.T) {
 		{
 			name: "propagates ai provider errors",
 			gitRepository: &mocks.GitRepository{
-				GetDiffFunc: func() (string, error) {
-					return "add commit workflow support", nil
+				GetDiffFunc: func(paths ...string) (string, error) {
+					return "diff --git a/internal/app/commit_service.go b/internal/app/commit_service.go\nindex 1111111..2222222 100644\n", nil
 				},
 			},
 			aiProvider: &mocks.AIProvider{
@@ -137,5 +138,39 @@ func TestCommitServiceGenerateCommit(t *testing.T) {
 				t.Fatalf("expected %d ai calls, got %d", testCase.expectedAIInvokes, len(testCase.aiProvider.GenerateCommitCalls))
 			}
 		})
+	}
+}
+
+func TestCommitServicePlanCommits(t *testing.T) {
+	t.Parallel()
+
+	service := NewCommitService(&mocks.GitRepository{
+		GetDiffFunc: func(paths ...string) (string, error) {
+			lines := []string{}
+			for _, path := range paths {
+				lines = append(lines, "diff --git a/"+path+" b/"+path, "index 1111111..2222222 100644")
+			}
+			return strings.Join(lines, "\n"), nil
+		},
+	}, &mocks.AIProvider{})
+
+	plans, err := service.PlanCommits([]string{
+		"internal/cli/a.go",
+		"internal/cli/b.go",
+		"internal/cli/c.go",
+		"internal/cli/d.go",
+		"internal/cli/e.go",
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if len(plans) != 2 {
+		t.Fatalf("expected two plans, got %d", len(plans))
+	}
+	if len(plans[0].Result.Paths) != 4 {
+		t.Fatalf("expected first plan with four files, got %d", len(plans[0].Result.Paths))
+	}
+	if len(plans[1].Result.Paths) != 1 {
+		t.Fatalf("expected second plan with one file, got %d", len(plans[1].Result.Paths))
 	}
 }
