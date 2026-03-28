@@ -34,7 +34,7 @@ func TestCommitCommandDryRun(t *testing.T) {
 	if len(gitRepository.CommitCalls) != 0 {
 		t.Fatalf("expected no commit calls, got %d", len(gitRepository.CommitCalls))
 	}
-	if !strings.Contains(output.String(), "commit message: feat: add commit command") {
+	if !strings.Contains(output.String(), "message: feat: add commit command") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
 }
@@ -55,6 +55,7 @@ func TestCommitCommandYesFlag(t *testing.T) {
 
 	command.SetOut(output)
 	command.SetErr(output)
+	command.SetIn(strings.NewReader("y\n"))
 	command.SetArgs([]string{"--yes"})
 
 	err := command.Execute()
@@ -68,6 +69,66 @@ func TestCommitCommandYesFlag(t *testing.T) {
 		t.Fatalf("unexpected commit message: %q", gitRepository.CommitCalls[0])
 	}
 	if !strings.Contains(output.String(), "commit created") {
+		t.Fatalf("unexpected output: %q", output.String())
+	}
+}
+
+func TestCommitCommandConfirmsBeforeCommit(t *testing.T) {
+	t.Parallel()
+
+	output := &bytes.Buffer{}
+	gitRepository := &mocks.GitRepository{
+		GetDiffFunc: func() (string, error) {
+			return "fix confirm flow", nil
+		},
+	}
+	command := newCommitCommandWithDependencies(commitDependencies{
+		gitRepository: gitRepository,
+		aiProvider:    &mocks.AIProvider{},
+	})
+
+	command.SetOut(output)
+	command.SetErr(output)
+	command.SetIn(strings.NewReader("y\n"))
+
+	err := command.Execute()
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if len(gitRepository.CommitCalls) != 1 {
+		t.Fatalf("expected one commit call, got %d", len(gitRepository.CommitCalls))
+	}
+	if !strings.Contains(output.String(), "create commit? [y/N]: ") {
+		t.Fatalf("unexpected output: %q", output.String())
+	}
+}
+
+func TestCommitCommandCancelsWithoutConfirmation(t *testing.T) {
+	t.Parallel()
+
+	output := &bytes.Buffer{}
+	gitRepository := &mocks.GitRepository{
+		GetDiffFunc: func() (string, error) {
+			return "fix confirm flow", nil
+		},
+	}
+	command := newCommitCommandWithDependencies(commitDependencies{
+		gitRepository: gitRepository,
+		aiProvider:    &mocks.AIProvider{},
+	})
+
+	command.SetOut(output)
+	command.SetErr(output)
+	command.SetIn(strings.NewReader("n\n"))
+
+	err := command.Execute()
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if len(gitRepository.CommitCalls) != 0 {
+		t.Fatalf("expected no commit calls, got %d", len(gitRepository.CommitCalls))
+	}
+	if !strings.Contains(output.String(), "commit canceled") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
 }

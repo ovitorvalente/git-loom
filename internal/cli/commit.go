@@ -9,6 +9,7 @@ import (
 	infraai "github.com/ovitorvalente/git-loom/internal/infra/ai"
 	infragit "github.com/ovitorvalente/git-loom/internal/infra/git"
 	"github.com/ovitorvalente/git-loom/internal/interfaces"
+	"github.com/ovitorvalente/git-loom/internal/ui"
 )
 
 type commitDependencies struct {
@@ -50,12 +51,24 @@ func runCommitCommand(command *cobra.Command, dependencies commitDependencies, o
 		return err
 	}
 
-	if _, err := fmt.Fprintf(command.OutOrStdout(), "commit message: %s\n", result.Message); err != nil {
+	formattedOutput := ui.FormatCommitResult(result)
+	if _, err := fmt.Fprintf(command.OutOrStdout(), "%s\n", formattedOutput); err != nil {
 		return err
 	}
 
-	if options.dryRun || !options.yes {
+	if options.dryRun {
 		return nil
+	}
+
+	if !options.yes {
+		confirmed, err := ui.ConfirmCommit(command.InOrStdin(), command.OutOrStdout())
+		if err != nil {
+			return err
+		}
+		if !confirmed {
+			_, err = fmt.Fprintln(command.OutOrStdout(), "commit canceled")
+			return err
+		}
 	}
 
 	if err := dependencies.gitRepository.Commit(result.Message); err != nil {
