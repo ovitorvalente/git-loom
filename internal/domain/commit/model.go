@@ -7,6 +7,8 @@ const (
 	TypeFix      Type = "fix"
 	TypeRefactor Type = "refactor"
 	TypeChore    Type = "chore"
+	TypeDocs     Type = "docs"
+	TypeTest     Type = "test"
 )
 
 type Model struct {
