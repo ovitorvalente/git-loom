@@ -13,6 +13,17 @@ gitloom is a CLI tool that automates Git workflows by analyzing code changes, ge
 
 ---
 
+# SKILLS
+
+Utilize as seguintes habilidades para desenvolver o projeto:
+
+- ~/.agents/skills/golang-pro
+- ~/.agents/skills/clean-architecture
+- ~/.agents/skills/clean-code
+- ~/.agents/skills/domain-driven-design
+
+---
+
 # 🧠 Architectural Vision
 
 gitloom is not just a CLI tool.
