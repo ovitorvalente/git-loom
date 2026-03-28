@@ -22,7 +22,7 @@ func TestGitRepositoryTracksCalls(t *testing.T) {
 
 	expectedError := errors.New("commit failed")
 	repository := &mocks.GitRepository{
-		GetDiffFunc: func() (string, error) {
+		GetDiffFunc: func(paths ...string) (string, error) {
 			return "diff content", nil
 		},
 		CommitFunc: func(message string) error {
@@ -47,6 +47,9 @@ func TestGitRepositoryTracksCalls(t *testing.T) {
 	}
 	if diff != "diff content" {
 		t.Fatalf("expected diff content, got %s", diff)
+	}
+	if len(repository.GetDiffCalls) != 1 {
+		t.Fatalf("expected one diff call, got %d", len(repository.GetDiffCalls))
 	}
 
 	err = repository.Commit("feat(core): add mocks")
