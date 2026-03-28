@@ -1,20 +1,58 @@
 package mocks
 
 type GitRepository struct {
-	GetDiffFunc      func() (string, error)
-	CommitFunc       func(message string) error
-	CreateBranchFunc func(name string) error
+	GetDiffFunc          func(paths ...string) (string, error)
+	ListStagedFilesFunc  func() ([]string, error)
+	ListChangedFilesFunc func() ([]string, error)
+	StageFilesFunc       func(paths []string) error
+	CommitFunc           func(message string) error
+	CommitPathsFunc      func(message string, paths []string) error
+	CreateBranchFunc     func(name string) error
 
+	GetDiffCalls      [][]string
+	StageFilesCalls   [][]string
 	CommitCalls       []string
+	CommitPathsCalls  []CommitCall
 	CreateBranchCalls []string
 }
 
-func (mock *GitRepository) GetDiff() (string, error) {
+type CommitCall struct {
+	Message string
+	Paths   []string
+}
+
+func (mock *GitRepository) GetDiff(paths ...string) (string, error) {
+	mock.GetDiffCalls = append(mock.GetDiffCalls, append([]string(nil), paths...))
 	if mock.GetDiffFunc == nil {
 		return "", nil
 	}
 
-	return mock.GetDiffFunc()
+	return mock.GetDiffFunc(paths...)
+}
+
+func (mock *GitRepository) ListStagedFiles() ([]string, error) {
+	if mock.ListStagedFilesFunc == nil {
+		return nil, nil
+	}
+
+	return mock.ListStagedFilesFunc()
+}
+
+func (mock *GitRepository) ListChangedFiles() ([]string, error) {
+	if mock.ListChangedFilesFunc == nil {
+		return nil, nil
+	}
+
+	return mock.ListChangedFilesFunc()
+}
+
+func (mock *GitRepository) StageFiles(paths []string) error {
+	mock.StageFilesCalls = append(mock.StageFilesCalls, append([]string(nil), paths...))
+	if mock.StageFilesFunc == nil {
+		return nil
+	}
+
+	return mock.StageFilesFunc(paths)
 }
 
 func (mock *GitRepository) Commit(message string) error {
@@ -24,6 +62,18 @@ func (mock *GitRepository) Commit(message string) error {
 	}
 
 	return mock.CommitFunc(message)
+}
+
+func (mock *GitRepository) CommitPaths(message string, paths []string) error {
+	mock.CommitPathsCalls = append(mock.CommitPathsCalls, CommitCall{
+		Message: message,
+		Paths:   append([]string(nil), paths...),
+	})
+	if mock.CommitPathsFunc == nil {
+		return nil
+	}
+
+	return mock.CommitPathsFunc(message, paths)
 }
 
 func (mock *GitRepository) CreateBranch(name string) error {
