@@ -30,6 +30,21 @@ func TestClassifyCommit(t *testing.T) {
 			diff:     "update dependency metadata",
 			expected: TypeChore,
 		},
+		{
+			name:     "returns fix for removed broken behavior",
+			diff:     "remove flaky timeout workaround after bug fix",
+			expected: TypeFix,
+		},
+		{
+			name:     "returns refactor for moved internals",
+			diff:     "move generator helpers to dedicated functions",
+			expected: TypeRefactor,
+		},
+		{
+			name:     "returns chore for documentation updates",
+			diff:     "docs: update installation guide",
+			expected: TypeChore,
+		},
 	}
 
 	for _, testCase := range testCases {

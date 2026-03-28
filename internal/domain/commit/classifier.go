@@ -4,16 +4,36 @@ import "strings"
 
 func ClassifyCommit(diff string) Type {
 	normalizedDiff := strings.ToLower(diff)
-	switch {
-	case containsAny(normalizedDiff, "fix", "bug", "error", "fail", "hotfix"):
+	if hasFixSignal(normalizedDiff) {
 		return TypeFix
-	case containsAny(normalizedDiff, "refactor", "cleanup", "rename", "extract", "simplify"):
-		return TypeRefactor
-	case containsAny(normalizedDiff, "feat", "add", "create", "implement", "introduce"):
-		return TypeFeat
-	default:
-		return TypeChore
 	}
+	if hasRefactorSignal(normalizedDiff) {
+		return TypeRefactor
+	}
+	if hasFeatureSignal(normalizedDiff) {
+		return TypeFeat
+	}
+
+	return TypeChore
+}
+
+func hasFixSignal(content string) bool {
+	switch {
+	case containsAny(content, "fix", "bug", "error", "fail", "hotfix", "regression", "broken", "issue"):
+		return true
+	case containsAny(content, "remove", "delete", "revert") && containsAny(content, "bug", "error", "fail", "broken"):
+		return true
+	default:
+		return false
+	}
+}
+
+func hasRefactorSignal(content string) bool {
+	return containsAny(content, "refactor", "cleanup", "rename", "extract", "simplify", "move", "reorganize")
+}
+
+func hasFeatureSignal(content string) bool {
+	return containsAny(content, "feat", "add", "create", "implement", "introduce", "support", "enable")
 }
 
 func containsAny(content string, keywords ...string) bool {

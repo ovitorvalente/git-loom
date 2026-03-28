@@ -2,11 +2,13 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/ovitorvalente/git-loom/internal/app"
 	infraai "github.com/ovitorvalente/git-loom/internal/infra/ai"
+	infraconfig "github.com/ovitorvalente/git-loom/internal/infra/config"
 	infragit "github.com/ovitorvalente/git-loom/internal/infra/git"
 	"github.com/ovitorvalente/git-loom/internal/interfaces"
 	"github.com/ovitorvalente/git-loom/internal/ui"
@@ -15,6 +17,7 @@ import (
 type commitDependencies struct {
 	gitRepository interfaces.GitRepository
 	aiProvider    interfaces.AIProvider
+	config        commitConfig
 }
 
 type commitOptions struct {
@@ -22,10 +25,24 @@ type commitOptions struct {
 	yes    bool
 }
 
+type commitConfig struct {
+	DefaultScope string
+	AutoConfirm  bool
+}
+
 func newCommitCommand() *cobra.Command {
+	configuration, err := infraconfig.Load(".gitloom.yaml")
+	if err != nil {
+		configuration = infraconfig.DefaultConfig()
+	}
+
 	return newCommitCommandWithDependencies(commitDependencies{
 		gitRepository: infragit.NewRepository(),
 		aiProvider:    infraai.NewNoopProvider(),
+		config: commitConfig{
+			DefaultScope: configuration.Commit.Scope,
+			AutoConfirm:  configuration.CLI.AutoConfirm,
+		},
 	})
 }
 
@@ -46,7 +63,9 @@ func newCommitCommandWithDependencies(dependencies commitDependencies) *cobra.Co
 
 func runCommitCommand(command *cobra.Command, dependencies commitDependencies, options commitOptions) error {
 	service := app.NewCommitService(dependencies.gitRepository, dependencies.aiProvider)
-	result, err := service.GenerateCommit()
+	result, err := service.GenerateCommit(app.GenerateCommitOptions{
+		Scope: dependencies.config.DefaultScope,
+	})
 	if err != nil {
 		return err
 	}
@@ -60,21 +79,31 @@ func runCommitCommand(command *cobra.Command, dependencies commitDependencies, o
 		return nil
 	}
 
-	if !options.yes {
-		confirmed, err := ui.ConfirmCommit(command.InOrStdin(), command.OutOrStdout())
-		if err != nil {
-			return err
-		}
-		if !confirmed {
-			_, err = fmt.Fprintln(command.OutOrStdout(), "commit canceled")
-			return err
-		}
+	if shouldSkipConfirmation(options, dependencies.config) {
+		return createCommit(command, dependencies.gitRepository, result.Message)
 	}
 
-	if err := dependencies.gitRepository.Commit(result.Message); err != nil {
+	confirmed, err := ui.ConfirmCommit(command.InOrStdin(), command.OutOrStdout())
+	if err != nil {
+		return err
+	}
+	if !confirmed {
+		_, err = fmt.Fprintln(command.OutOrStdout(), "commit canceled")
 		return err
 	}
 
-	_, err = fmt.Fprintf(command.OutOrStdout(), "commit created\n")
+	return createCommit(command, dependencies.gitRepository, result.Message)
+}
+
+func shouldSkipConfirmation(options commitOptions, configuration commitConfig) bool {
+	return options.yes || configuration.AutoConfirm
+}
+
+func createCommit(command *cobra.Command, gitRepository interfaces.GitRepository, message string) error {
+	if err := gitRepository.Commit(message); err != nil {
+		return err
+	}
+
+	_, err := fmt.Fprintf(command.OutOrStdout(), "commit created: %s\n", strings.TrimSpace(message))
 	return err
 }

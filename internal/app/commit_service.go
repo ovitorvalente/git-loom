@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"reflect"
 	"strings"
 
@@ -8,9 +9,15 @@ import (
 	"github.com/ovitorvalente/git-loom/internal/interfaces"
 )
 
+var ErrEmptyDiff = errors.New("no staged changes found; run git add before gitloom commit")
+
 type CommitService struct {
 	git interfaces.GitRepository
 	ai  interfaces.AIProvider
+}
+
+type GenerateCommitOptions struct {
+	Scope string
 }
 
 type CommitResult struct {
@@ -26,13 +33,16 @@ func NewCommitService(gitRepository interfaces.GitRepository, aiProvider interfa
 	}
 }
 
-func (service CommitService) GenerateCommit() (CommitResult, error) {
+func (service CommitService) GenerateCommit(options ...GenerateCommitOptions) (CommitResult, error) {
 	diff, err := service.git.GetDiff()
 	if err != nil {
 		return CommitResult{}, err
 	}
+	if strings.TrimSpace(diff) == "" {
+		return CommitResult{}, ErrEmptyDiff
+	}
 
-	model := buildCommitModel(diff)
+	model := buildCommitModel(diff, firstCommitOptions(options))
 	message, err := service.resolveMessage(diff, model)
 	if err != nil {
 		return CommitResult{}, err
@@ -74,11 +84,20 @@ func isNilAIProvider(provider interfaces.AIProvider) bool {
 	return providerValue.IsNil()
 }
 
-func buildCommitModel(diff string) domaincommit.Model {
+func buildCommitModel(diff string, options GenerateCommitOptions) domaincommit.Model {
 	return domaincommit.Model{
 		Type:        domaincommit.ClassifyCommit(diff),
+		Scope:       strings.TrimSpace(options.Scope),
 		Description: buildDescription(diff),
 	}
+}
+
+func firstCommitOptions(options []GenerateCommitOptions) GenerateCommitOptions {
+	if len(options) == 0 {
+		return GenerateCommitOptions{}
+	}
+
+	return options[0]
 }
 
 func buildDescription(diff string) string {

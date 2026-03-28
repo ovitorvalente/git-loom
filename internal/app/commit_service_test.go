@@ -18,6 +18,7 @@ func TestCommitServiceGenerateCommit(t *testing.T) {
 		name              string
 		gitRepository     *mocks.GitRepository
 		aiProvider        *mocks.AIProvider
+		options           GenerateCommitOptions
 		expectedType      domaincommit.Type
 		expectedMessage   string
 		expectedDiff      string
@@ -33,6 +34,21 @@ func TestCommitServiceGenerateCommit(t *testing.T) {
 			},
 			expectedType:      domaincommit.TypeFeat,
 			expectedMessage:   "feat: add commit workflow support",
+			expectedDiff:      "add commit workflow support",
+			expectedAIInvokes: 0,
+		},
+		{
+			name: "applies configured scope",
+			gitRepository: &mocks.GitRepository{
+				GetDiffFunc: func() (string, error) {
+					return "add commit workflow support", nil
+				},
+			},
+			options: GenerateCommitOptions{
+				Scope: "core",
+			},
+			expectedType:      domaincommit.TypeFeat,
+			expectedMessage:   "feat(core): add commit workflow support",
 			expectedDiff:      "add commit workflow support",
 			expectedAIInvokes: 0,
 		},
@@ -67,6 +83,15 @@ func TestCommitServiceGenerateCommit(t *testing.T) {
 			expectedError: diffError,
 		},
 		{
+			name: "returns error when diff is empty",
+			gitRepository: &mocks.GitRepository{
+				GetDiffFunc: func() (string, error) {
+					return " \n\t", nil
+				},
+			},
+			expectedError: ErrEmptyDiff,
+		},
+		{
 			name: "propagates ai provider errors",
 			gitRepository: &mocks.GitRepository{
 				GetDiffFunc: func() (string, error) {
@@ -89,7 +114,7 @@ func TestCommitServiceGenerateCommit(t *testing.T) {
 
 			service := NewCommitService(testCase.gitRepository, testCase.aiProvider)
 
-			result, err := service.GenerateCommit()
+			result, err := service.GenerateCommit(testCase.options)
 			if !errors.Is(err, testCase.expectedError) {
 				t.Fatalf("expected error %v, got %v", testCase.expectedError, err)
 			}

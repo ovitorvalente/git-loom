@@ -39,6 +39,36 @@ func TestCommitCommandDryRun(t *testing.T) {
 	}
 }
 
+func TestCommitCommandUsesConfiguredScope(t *testing.T) {
+	t.Parallel()
+
+	output := &bytes.Buffer{}
+	gitRepository := &mocks.GitRepository{
+		GetDiffFunc: func() (string, error) {
+			return "add config support", nil
+		},
+	}
+	command := newCommitCommandWithDependencies(commitDependencies{
+		gitRepository: gitRepository,
+		aiProvider:    &mocks.AIProvider{},
+		config: commitConfig{
+			DefaultScope: "core",
+		},
+	})
+
+	command.SetOut(output)
+	command.SetErr(output)
+	command.SetArgs([]string{"--dry-run"})
+
+	err := command.Execute()
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if !strings.Contains(output.String(), "message: feat(core): add config support") {
+		t.Fatalf("unexpected output: %q", output.String())
+	}
+}
+
 func TestCommitCommandYesFlag(t *testing.T) {
 	t.Parallel()
 
@@ -149,6 +179,27 @@ func TestCommitCommandPropagatesErrors(t *testing.T) {
 	err := command.Execute()
 	if !errors.Is(err, expectedError) {
 		t.Fatalf("expected %v, got %v", expectedError, err)
+	}
+}
+
+func TestCommitCommandShowsHelpfulEmptyDiffError(t *testing.T) {
+	t.Parallel()
+
+	command := newCommitCommandWithDependencies(commitDependencies{
+		gitRepository: &mocks.GitRepository{
+			GetDiffFunc: func() (string, error) {
+				return " ", nil
+			},
+		},
+		aiProvider: &mocks.AIProvider{},
+	})
+
+	err := command.Execute()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if err.Error() != "no staged changes found; run git add before gitloom commit" {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
