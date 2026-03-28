@@ -36,9 +36,9 @@ func TestGenerateMessage(t *testing.T) {
 			name: "defaults unknown type to chore",
 			model: Model{
 				Type:        Type("unknown"),
-				Description: "update generated files",
+				Description: "atualizar arquivos gerados",
 			},
-			expected: "chore: update generated files",
+			expected: "chore: atualizar arquivos gerados",
 		},
 		{
 			name: "returns error for empty description",
@@ -47,6 +47,15 @@ func TestGenerateMessage(t *testing.T) {
 				Scope: "core",
 			},
 			expectedErr: ErrEmptyDescription,
+		},
+		{
+			name: "limits header length",
+			model: Model{
+				Type:        TypeFeat,
+				Scope:       "commit",
+				Description: "adicionar suporte para gerar mensagens estruturadas a partir de arquivos alterados",
+			},
+			expected: "feat(commit): adicionar suporte para gerar mensagens estruturadas a",
 		},
 	}
 
