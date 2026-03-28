@@ -42,14 +42,14 @@ func TestConfirmCommit(t *testing.T) {
 			t.Parallel()
 
 			output := &bytes.Buffer{}
-			confirmed, err := ConfirmCommit(strings.NewReader(testCase.input), output)
+			confirmed, err := ConfirmCommit(strings.NewReader(testCase.input), output, "criar commit?")
 			if err != nil {
 				t.Fatalf("expected nil error, got %v", err)
 			}
 			if confirmed != testCase.expected {
 				t.Fatalf("expected %v, got %v", testCase.expected, confirmed)
 			}
-			if !strings.Contains(output.String(), "create commit? [y/N]: ") {
+			if !strings.Contains(output.String(), "criar commit? [y/N]: ") {
 				t.Fatalf("unexpected prompt output: %q", output.String())
 			}
 		})

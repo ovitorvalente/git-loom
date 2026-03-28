@@ -24,12 +24,13 @@ func TestFormatCommitResult(t *testing.T) {
 	formattedOutput := FormatCommitResult(result)
 
 	expectedParts := []string{
-		"generated commit",
-		"type: feat",
-		"scope: core",
-		"description: add commit formatter",
-		"message: feat(core): add commit formatter",
-		"body: keep output easy to read",
+		"commit gerado",
+		"tipo: feat",
+		"escopo: core",
+		"descricao: add commit formatter",
+		"mensagem: feat(core): add commit formatter",
+		"detalhes:",
+		"keep output easy to read",
 	}
 
 	for _, expectedPart := range expectedParts {
@@ -43,19 +44,50 @@ func TestFormatCommitResultWithoutOptionalFields(t *testing.T) {
 	t.Parallel()
 
 	result := app.CommitResult{
-		Message: "chore: update repository changes",
+		Message: "chore: atualizar mudancas do repositorio",
 		Commit: domaincommit.Model{
 			Type:        domaincommit.TypeChore,
-			Description: "update repository changes",
+			Description: "atualizar mudancas do repositorio",
 		},
 	}
 
 	formattedOutput := FormatCommitResult(result)
 
-	if !strings.Contains(formattedOutput, "scope: -") {
+	if !strings.Contains(formattedOutput, "escopo: -") {
 		t.Fatalf("expected empty scope placeholder, got %q", formattedOutput)
 	}
-	if strings.Contains(formattedOutput, "body:") {
+	if strings.Contains(formattedOutput, "detalhes:") {
 		t.Fatalf("did not expect body line, got %q", formattedOutput)
+	}
+}
+
+func TestFormatCommitPlan(t *testing.T) {
+	t.Parallel()
+
+	result := app.CommitResult{
+		Message: "feat(cli): adicionar commit\n\n- adicionado commit",
+		Commit: domaincommit.Model{
+			Type:        domaincommit.TypeFeat,
+			Scope:       "cli",
+			Description: "adicionar commit",
+		},
+		Paths: []string{"internal/cli/commit.go"},
+	}
+
+	formattedOutput := FormatCommitPlan(1, 2, result)
+	if !strings.Contains(formattedOutput, "bloco 1/2") {
+		t.Fatalf("unexpected output: %q", formattedOutput)
+	}
+	if !strings.Contains(formattedOutput, "arquivos:") {
+		t.Fatalf("unexpected output: %q", formattedOutput)
+	}
+}
+
+func TestFormatChangedFiles(t *testing.T) {
+	t.Parallel()
+
+	formattedOutput := FormatChangedFiles([]string{"internal/app/commit_service.go"})
+	if !strings.Contains(formattedOutput, "arquivos em changes") {
+		t.Fatalf("unexpected output: %q", formattedOutput)
 	}
 }
