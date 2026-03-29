@@ -125,7 +125,7 @@ func runCommitCommand(command *cobra.Command, dependencies commitDependencies, o
 
 	if options.dryRun || options.review.preview {
 		if !options.review.json && len(review.Plans) > 1 {
-			result, err := tui.SelectCommits(review.Plans)
+			result, err := tui.RunCommitTUI(review.Plans)
 			if err != nil {
 				return err
 			}
@@ -133,13 +133,6 @@ func runCommitCommand(command *cobra.Command, dependencies commitDependencies, o
 				_, err := fmt.Fprintln(command.OutOrStdout(), shared.MessageCommitCanceled)
 				return err
 			}
-			selectedCount := 0
-			for _, approved := range result.Approved {
-				if approved {
-					selectedCount++
-				}
-			}
-			fmt.Fprintf(command.OutOrStdout(), "\n  %d/%d commits selecionados (dry-run, nenhum commit criado)\n", selectedCount, len(review.Plans))
 		}
 		return nil
 	}
@@ -188,7 +181,7 @@ func createPlannedCommits(command *cobra.Command, gitRepository interfaces.GitRe
 	plans := review.Plans
 
 	if !asJSON && !autoApprove && len(plans) > 1 {
-		result, err := tui.SelectCommits(plans)
+		result, err := tui.RunCommitTUI(plans)
 		if err != nil {
 			return err
 		}
