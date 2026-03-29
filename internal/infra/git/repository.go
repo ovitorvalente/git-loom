@@ -37,7 +37,7 @@ func (repository Repository) ListStagedFiles() ([]string, error) {
 }
 
 func (repository Repository) ListChangedFiles() ([]string, error) {
-	return repository.listFiles("diff", "--name-only", "--diff-filter=M")
+	return repository.listFiles("diff", "--name-only", "--diff-filter=MD")
 }
 
 func (repository Repository) StageFiles(paths []string) error {
@@ -45,7 +45,7 @@ func (repository Repository) StageFiles(paths []string) error {
 		return nil
 	}
 
-	args := []string{"add"}
+	args := []string{"add", "-A", "--"}
 	args = append(args, paths...)
 	_, err := repository.run("git", args...)
 	return err
