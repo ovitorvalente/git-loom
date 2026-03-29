@@ -7,6 +7,7 @@ const (
 	MessageYesFlag              = "cria o commit sem pedir confirmacao"
 	MessagePreviewFlag          = "mostra preview do diff e do impacto dos commits planejados"
 	MessageStrictFlag           = "falha quando o plano nao atinge o nivel minimo de qualidade"
+	MessageVerboseFlag          = "expande a analise com detalhes tecnicos e contexto adicional"
 	MessageCommitGenerated      = "commit gerado"
 	MessageCommitCreated        = "commit criado: %s"
 	MessageCommitCanceled       = "commit cancelado"
