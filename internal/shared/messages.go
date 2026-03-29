@@ -1,0 +1,27 @@
+package shared
+
+const (
+	MessageRootShort            = "Automatiza fluxos de trabalho com Git"
+	MessageCommitShort          = "Gera uma mensagem de commit a partir das mudancas staged"
+	MessageDryRunFlag           = "mostra a mensagem gerada sem criar o commit"
+	MessageYesFlag              = "cria o commit sem pedir confirmacao"
+	MessageCommitGenerated      = "commit gerado"
+	MessageCommitCreated        = "commit criado: %s"
+	MessageCommitCanceled       = "commit cancelado"
+	MessageCommitFinished       = "fluxo finalizado com sucesso"
+	MessageCommitFarewell       = "obrigado por usar o gitloom"
+	MessageCommitPlanQuestion   = "criar commits planejados?"
+	MessageCreateBlockQuestion  = "criar bloco %d/%d?"
+	MessageIgnoredBlock         = "bloco %d ignorado"
+	MessageChangedFiles         = "arquivos em changes:"
+	MessageStageChangedQuestion = "adicionar arquivos em changes ao staged?"
+	MessageEmptyDiff            = "nenhuma mudanca staged encontrada; execute git add antes de gitloom commit"
+	MessageCommitPromptSuffix   = "[y/N]: "
+	MessageFilesLabel           = "arquivos"
+	MessageDetailsLabel         = "detalhes"
+	MessageTypeLabel            = "tipo"
+	MessageScopeLabel           = "escopo"
+	MessageDescriptionLabel     = "descricao"
+	MessageHeaderLabel          = "mensagem"
+	MessageBlockLabel           = "bloco %d/%d"
+)
