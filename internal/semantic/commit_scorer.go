@@ -5,26 +5,77 @@ import "strings"
 func ScoreCommit(intent ChangeIntent, context CommitContext) CommitQuality {
 	score := 100
 	reasons := []string{}
+	criteria := []QualityCriteria{}
 
-	if len(context.Files) > 4 {
+	fileCount := len(context.Files)
+	if fileCount > 4 {
 		score -= 40
 		reasons = append(reasons, "bloco excede o limite recomendado de 4 arquivos")
+		criteria = append(criteria, QualityCriteria{
+			Name: "tamanho", Passed: false, Warning: true,
+			Message: "excede limite de 4 arquivos",
+		})
+	} else {
+		criteria = append(criteria, QualityCriteria{
+			Name: "tamanho", Passed: true,
+		})
 	}
+
 	if intent.Scope == "" {
 		score -= 15
 		reasons = append(reasons, "escopo nao foi identificado com clareza")
+		criteria = append(criteria, QualityCriteria{
+			Name: "escopo", Passed: false, Warning: true,
+			Message: "escopo nao identificado",
+		})
+	} else if IsGenericScope(intent.Scope) {
+		criteria = append(criteria, QualityCriteria{
+			Name: "escopo", Passed: false, Warning: true,
+			Message: "escopo generico: " + intent.Scope,
+		})
+	} else {
+		criteria = append(criteria, QualityCriteria{
+			Name: "escopo", Passed: true,
+		})
 	}
+
 	if isGenericDescription(intent.Description) {
 		score -= 25
 		reasons = append(reasons, "descricao ainda esta generica")
+		criteria = append(criteria, QualityCriteria{
+			Name: "descricao", Passed: false, Warning: true,
+			Message: "descricao generica",
+		})
+	} else {
+		criteria = append(criteria, QualityCriteria{
+			Name: "descricao", Passed: true,
+		})
 	}
+
 	if hasMixedScopes(context.Files) {
 		score -= 15
 		reasons = append(reasons, "arquivos misturam contextos diferentes")
+		criteria = append(criteria, QualityCriteria{
+			Name: "coerencia", Passed: false, Warning: true,
+			Message: "contextos mistos",
+		})
+	} else {
+		criteria = append(criteria, QualityCriteria{
+			Name: "coerencia", Passed: true,
+		})
 	}
+
 	if expectedType := inferExpectedType(context); expectedType != "" && expectedType != intent.Type {
 		score -= 20
 		reasons = append(reasons, "tipo pode nao refletir bem a mudanca")
+		criteria = append(criteria, QualityCriteria{
+			Name: "tipo", Passed: false, Warning: true,
+			Message: "tipo pode nao refletir bem a mudanca",
+		})
+	} else {
+		criteria = append(criteria, QualityCriteria{
+			Name: "tipo", Passed: true,
+		})
 	}
 
 	if score < 0 {
@@ -32,8 +83,9 @@ func ScoreCommit(intent ChangeIntent, context CommitContext) CommitQuality {
 	}
 
 	return CommitQuality{
-		Score:   score,
-		Reasons: reasons,
+		Score:    score,
+		Reasons:  reasons,
+		Criteria: criteria,
 	}
 }
 

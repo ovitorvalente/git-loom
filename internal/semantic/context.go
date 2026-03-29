@@ -30,9 +30,17 @@ type CommitPreview struct {
 	Deletions    int
 }
 
+type QualityCriteria struct {
+	Name    string
+	Passed  bool
+	Warning bool
+	Message string
+}
+
 type CommitQuality struct {
-	Score   int
-	Reasons []string
+	Score    int
+	Reasons  []string
+	Criteria []QualityCriteria
 }
 
 func NewCommitContext(diff string) CommitContext {
