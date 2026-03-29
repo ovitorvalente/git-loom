@@ -19,6 +19,10 @@ func DetectIntent(commitType string, context CommitContext) ChangeIntent {
 }
 
 func buildIntentDescription(commitType string, scope string, target string, context CommitContext) string {
+	if commitType == "test" && strings.TrimSpace(target) != "" {
+		return "ajustar " + target
+	}
+
 	switch scope {
 	case "readme":
 		if containsTag(context.Tags, "commit") || containsTag(context.Tags, "cli") {
@@ -83,6 +87,9 @@ func detectIntentTarget(scope string, context CommitContext) string {
 	case "cli":
 		return "fluxo de commit"
 	case "ui":
+		if containsTag(context.Tags, "renderer") || containsTag(context.Tags, "output") || containsTag(context.Tags, "prompt") {
+			return "camada de apresentacao do cli"
+		}
 		return "layout do cli"
 	case "git":
 		return "repositorio git"
@@ -114,6 +121,8 @@ func normalizeIntentTarget(scope string, path string) string {
 		return "fluxo de commit"
 	case strings.HasSuffix(path, "commit_service.go"):
 		return "planejamento de commits"
+	case strings.HasSuffix(path, "commit_feedback.go"):
+		return "feedback semantico de commit"
 	case strings.HasSuffix(path, "prompts.go"):
 		return "prompts do cli"
 	case strings.HasSuffix(path, "renderer.go"):
@@ -121,7 +130,13 @@ func normalizeIntentTarget(scope string, path string) string {
 	case strings.HasSuffix(path, "commit_view.go"):
 		return "visao de commit"
 	case strings.HasSuffix(path, "summary_view.go"):
-		return "resumo do cli"
+		return "resumo do fluxo de commit"
+	case strings.HasSuffix(path, "messages.go"):
+		return "mensagens do cli"
+	case strings.HasSuffix(path, "intent_detector.go"):
+		return "heuristicas de intencao semantica"
+	case strings.HasSuffix(path, "scope_normalizer.go"):
+		return "normalizacao de escopo"
 	case strings.HasSuffix(path, "output.go"):
 		return "layout do cli"
 	case strings.HasSuffix(path, "repository.go"):
@@ -133,6 +148,10 @@ func normalizeIntentTarget(scope string, path string) string {
 	case strings.HasSuffix(path, "generator.go"):
 		return "geracao de mensagens de commit"
 	case strings.HasSuffix(path, "_test.go"):
+		subject := strings.TrimSuffix(baseName, "_test.go") + ".go"
+		if target := normalizeIntentTarget(scope, subject); target != "" {
+			return "testes de " + target
+		}
 		name := strings.TrimSuffix(baseName, "_test.go")
 		return "testes de " + strings.ReplaceAll(name, "_", " ")
 	case scope != "":
