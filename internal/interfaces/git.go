@@ -2,6 +2,7 @@ package interfaces
 
 type GitRepository interface {
 	GetDiff(paths ...string) (string, error)
+	IsRepository() (bool, error)
 	ListStagedFiles() ([]string, error)
 	ListChangedFiles() ([]string, error)
 	StageFiles(paths []string) error
