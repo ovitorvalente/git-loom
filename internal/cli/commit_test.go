@@ -40,7 +40,10 @@ func TestCommitCommandDryRun(t *testing.T) {
 	if !strings.Contains(output.String(), "bloco 1/1") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
-	if !strings.Contains(output.String(), "mensagem: feat(cli): adicionar commit") {
+	if !strings.Contains(output.String(), "mensagem: feat(cli): adicionar comando commit") {
+		t.Fatalf("unexpected output: %q", output.String())
+	}
+	if !strings.Contains(output.String(), "adiciona comando commit em cli") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
 }
