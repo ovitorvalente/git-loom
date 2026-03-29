@@ -4,10 +4,12 @@ import (
 	"errors"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 
 	domaincommit "github.com/ovitorvalente/git-loom/internal/domain/commit"
 	"github.com/ovitorvalente/git-loom/internal/interfaces"
+	"github.com/ovitorvalente/git-loom/internal/semantic"
 	"github.com/ovitorvalente/git-loom/internal/shared"
 )
 
@@ -30,7 +32,24 @@ type CommitResult struct {
 }
 
 type CommitPlan struct {
-	Result CommitResult
+	Result        CommitResult
+	Preview       semantic.CommitPreview
+	Quality       semantic.CommitQuality
+	Context       semantic.CommitContext
+	SemanticGroup string
+}
+
+type CommitPreview = semantic.CommitPreview
+type CommitQuality = semantic.CommitQuality
+
+type CommitSuggestion struct {
+	Message        string
+	AutoApplicable bool
+}
+
+type CommitReview struct {
+	Plans       []CommitPlan
+	Suggestions []CommitSuggestion
 }
 
 func NewCommitService(gitRepository interfaces.GitRepository, aiProvider interfaces.AIProvider) CommitService {
@@ -58,17 +77,18 @@ func (service CommitService) GenerateCommitForPaths(paths []string, options ...G
 	return service.generateFromDiff(diff, paths, firstCommitOptions(options))
 }
 
-func (service CommitService) PlanCommits(paths []string, options ...GenerateCommitOptions) ([]CommitPlan, error) {
+func (service CommitService) PlanCommits(paths []string, options ...GenerateCommitOptions) (CommitReview, error) {
 	commitOptions := firstCommitOptions(options)
 	groupedPaths := map[string][]string{}
 
 	for _, path := range paths {
 		result, err := service.GenerateCommitForPaths([]string{path}, commitOptions)
 		if err != nil {
-			return nil, err
+			return CommitReview{}, err
 		}
 
-		groupKey := buildGroupKey(result.Commit.Type, result.Commit.Scope)
+		context := semantic.NewCommitContext(result.Diff)
+		groupKey := buildGroupKey(string(result.Commit.Type), result.Commit.Scope, semantic.BuildGroupingKey(string(result.Commit.Type), context))
 		groupedPaths[groupKey] = append(groupedPaths[groupKey], path)
 	}
 
@@ -77,15 +97,63 @@ func (service CommitService) PlanCommits(paths []string, options ...GenerateComm
 		for _, chunk := range chunkPaths(group, 4) {
 			result, err := service.GenerateCommitForPaths(chunk, commitOptions)
 			if err != nil {
-				return nil, err
+				return CommitReview{}, err
 			}
+			context := semantic.NewCommitContext(result.Diff)
+			intent := semantic.DetectIntent(string(result.Commit.Type), context)
 			plans = append(plans, CommitPlan{
-				Result: result,
+				Result: CommitResult{
+					Diff:    result.Diff,
+					Message: result.Message,
+					Commit:  result.Commit,
+					Paths:   result.Paths,
+				},
+				Preview:       semantic.BuildPreview(context),
+				Quality:       semantic.ScoreCommit(intent, context),
+				Context:       context,
+				SemanticGroup: semantic.BuildGroupingKey(string(result.Commit.Type), context),
 			})
 		}
 	}
 
-	return plans, nil
+	review := CommitReview{
+		Plans: plans,
+	}
+	review.Suggestions = buildSuggestions(review.Plans)
+
+	return review, nil
+}
+
+func (service CommitService) ApplySuggestions(review CommitReview, options ...GenerateCommitOptions) (CommitReview, error) {
+	mergedPaths := mergeSuggestedPlans(review.Plans)
+	if len(mergedPaths) == 0 {
+		return review, nil
+	}
+
+	commitOptions := firstCommitOptions(options)
+	plans := make([]CommitPlan, 0, len(mergedPaths))
+	for _, group := range mergedPaths {
+		result, err := service.GenerateCommitForPaths(group, commitOptions)
+		if err != nil {
+			return CommitReview{}, err
+		}
+
+		context := semantic.NewCommitContext(result.Diff)
+		intent := semantic.DetectIntent(string(result.Commit.Type), context)
+		plans = append(plans, CommitPlan{
+			Result:        result,
+			Preview:       semantic.BuildPreview(context),
+			Quality:       semantic.ScoreCommit(intent, context),
+			Context:       context,
+			SemanticGroup: semantic.BuildGroupingKey(string(result.Commit.Type), context),
+		})
+	}
+
+	optimizedReview := CommitReview{
+		Plans: plans,
+	}
+	optimizedReview.Suggestions = buildSuggestions(optimizedReview.Plans)
+	return optimizedReview, nil
 }
 
 func (service CommitService) generateFromDiff(diff string, paths []string, options GenerateCommitOptions) (CommitResult, error) {
@@ -93,7 +161,7 @@ func (service CommitService) generateFromDiff(diff string, paths []string, optio
 		return CommitResult{}, ErrEmptyDiff
 	}
 
-	model := buildCommitModel(diff, options)
+	model := buildCommitModel(diff, paths, options)
 	message, err := service.resolveMessage(diff, model)
 	if err != nil {
 		return CommitResult{}, err
@@ -136,17 +204,21 @@ func isNilAIProvider(provider interfaces.AIProvider) bool {
 	return providerValue.IsNil()
 }
 
-func buildCommitModel(diff string, options GenerateCommitOptions) domaincommit.Model {
-	analysis := domaincommit.AnalyzeDiff(diff, domaincommit.ClassifyCommit(diff))
+func buildCommitModel(diff string, paths []string, options GenerateCommitOptions) domaincommit.Model {
+	commitType := domaincommit.ClassifyCommit(diff)
+	analysis := domaincommit.AnalyzeDiff(diff, commitType)
+	context := semantic.NewCommitContext(diff)
+	intent := semantic.DetectIntent(string(commitType), context)
 	scope := strings.TrimSpace(options.Scope)
 	if scope == "" {
-		scope = analysis.Scope
+		scope = firstNonEmpty(intent.Scope, analysis.Scope)
 	}
 
 	return domaincommit.Model{
-		Type:        domaincommit.ClassifyCommit(diff),
+		Type:        commitType,
 		Scope:       scope,
-		Description: analysis.Description,
+		Intent:      intent.Intent,
+		Description: firstNonEmpty(intent.Description, analysis.Description, describeFallback(paths)),
 		Body:        analysis.Body,
 	}
 }
@@ -159,8 +231,8 @@ func firstCommitOptions(options []GenerateCommitOptions) GenerateCommitOptions {
 	return options[0]
 }
 
-func buildGroupKey(commitType domaincommit.Type, scope string) string {
-	return string(commitType) + "|" + scope
+func buildGroupKey(commitType string, scope string, semanticGroup string) string {
+	return commitType + "|" + scope + "|" + semanticGroup
 }
 
 func stableGroups(groupedPaths map[string][]string) [][]string {
@@ -195,4 +267,112 @@ func chunkPaths(paths []string, chunkSize int) [][]string {
 	}
 
 	return chunks
+}
+
+func buildSuggestions(plans []CommitPlan) []CommitSuggestion {
+	suggestions := []CommitSuggestion{}
+
+	for index, plan := range plans {
+		if plan.Quality.Score < 85 {
+			suggestions = append(suggestions, CommitSuggestion{
+				Message: "melhorar descricao do commit " + ordinal(index+1),
+			})
+		}
+	}
+
+	reducedPlans := mergeSuggestedPlans(plans)
+	if len(reducedPlans) > 0 && len(reducedPlans) < len(plans) {
+		suggestions = append(suggestions, CommitSuggestion{
+			Message:        "reduzir commits de " + ordinal(len(plans)) + " para " + ordinal(len(reducedPlans)),
+			AutoApplicable: true,
+		})
+	}
+
+	for index := 0; index < len(plans)-1; index++ {
+		currentPlan := plans[index]
+		nextPlan := plans[index+1]
+		if canMergePlans(currentPlan, nextPlan) {
+			suggestions = append(suggestions, CommitSuggestion{
+				Message:        "agrupar commits " + ordinal(index+1) + " e " + ordinal(index+2),
+				AutoApplicable: true,
+			})
+		}
+	}
+
+	return deduplicateSuggestions(suggestions)
+}
+
+func mergeSuggestedPlans(plans []CommitPlan) [][]string {
+	if len(plans) == 0 {
+		return nil
+	}
+
+	mergedPaths := [][]string{}
+	currentGroup := append([]string(nil), plans[0].Result.Paths...)
+	currentPlan := plans[0]
+
+	for index := 1; index < len(plans); index++ {
+		nextPlan := plans[index]
+		if canMergePlans(currentPlan, nextPlan) && len(currentGroup)+len(nextPlan.Result.Paths) <= 4 {
+			currentGroup = append(currentGroup, nextPlan.Result.Paths...)
+			currentPlan = nextPlan
+			continue
+		}
+
+		mergedPaths = append(mergedPaths, append([]string(nil), currentGroup...))
+		currentGroup = append([]string(nil), nextPlan.Result.Paths...)
+		currentPlan = nextPlan
+	}
+
+	mergedPaths = append(mergedPaths, append([]string(nil), currentGroup...))
+	return mergedPaths
+}
+
+func canMergePlans(left CommitPlan, right CommitPlan) bool {
+	if left.Result.Commit.Type != right.Result.Commit.Type {
+		return false
+	}
+	if left.Result.Commit.Scope != right.Result.Commit.Scope {
+		return false
+	}
+
+	return semantic.NormalizeScopeFromFiles(left.Context.Files) == semantic.NormalizeScopeFromFiles(right.Context.Files)
+}
+
+func deduplicateSuggestions(suggestions []CommitSuggestion) []CommitSuggestion {
+	seenSuggestions := map[string]bool{}
+	result := make([]CommitSuggestion, 0, len(suggestions))
+
+	for _, suggestion := range suggestions {
+		if suggestion.Message == "" || seenSuggestions[suggestion.Message] {
+			continue
+		}
+
+		seenSuggestions[suggestion.Message] = true
+		result = append(result, suggestion)
+	}
+
+	return result
+}
+
+func ordinal(value int) string {
+	return strconv.Itoa(value)
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+
+	return ""
+}
+
+func describeFallback(paths []string) string {
+	if len(paths) == 0 {
+		return ""
+	}
+
+	return semantic.NormalizeScope(paths[0])
 }
