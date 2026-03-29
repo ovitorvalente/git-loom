@@ -4,6 +4,26 @@ import "strings"
 
 func ClassifyCommit(diff string) Type {
 	normalizedDiff := strings.ToLower(diff)
+	changes := extractChanges(diff)
+
+	if hasDocsFileSignal(changes) || hasDocsSignal(normalizedDiff) {
+		return TypeDocs
+	}
+	if hasTestFileSignal(changes) || hasTestSignal(normalizedDiff) {
+		return TypeTest
+	}
+	if hasChoreFileSignal(changes) {
+		return TypeChore
+	}
+	if hasFixSignal(normalizedDiff) {
+		return TypeFix
+	}
+	if hasFeatureFileSignal(normalizedDiff) {
+		return TypeFeat
+	}
+	if hasRefactorFileSignal(normalizedDiff) {
+		return TypeRefactor
+	}
 	if hasDocsSignal(normalizedDiff) {
 		return TypeDocs
 	}
@@ -27,6 +47,50 @@ func ClassifyCommit(diff string) Type {
 	}
 
 	return TypeChore
+}
+
+func hasDocsFileSignal(changes []Change) bool {
+	if len(changes) == 0 {
+		return false
+	}
+
+	for _, change := range changes {
+		path := strings.ToLower(change.Path)
+		if path == "readme.md" || strings.HasSuffix(path, ".md") {
+			return true
+		}
+	}
+
+	return false
+}
+
+func hasTestFileSignal(changes []Change) bool {
+	if len(changes) == 0 {
+		return false
+	}
+
+	for _, change := range changes {
+		if strings.HasSuffix(strings.ToLower(change.Path), "_test.go") {
+			return true
+		}
+	}
+
+	return false
+}
+
+func hasChoreFileSignal(changes []Change) bool {
+	if len(changes) == 0 {
+		return false
+	}
+
+	for _, change := range changes {
+		path := strings.ToLower(change.Path)
+		if path == "go.mod" || path == "go.sum" || path == "makefile" || path == ".gitloom.yaml" {
+			return true
+		}
+	}
+
+	return false
 }
 
 func hasFixSignal(content string) bool {

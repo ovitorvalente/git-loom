@@ -1,6 +1,9 @@
 package commit
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestClassifyCommit(t *testing.T) {
 	t.Parallel()
@@ -49,6 +52,22 @@ func TestClassifyCommit(t *testing.T) {
 			name:     "returns test for test changes",
 			diff:     "add commit_service_test.go coverage",
 			expected: TypeTest,
+		},
+		{
+			name: "returns docs for readme file changes",
+			diff: strings.Join([]string{
+				"diff --git a/README.md b/README.md",
+				"index 1111111..2222222 100644",
+			}, "\n"),
+			expected: TypeDocs,
+		},
+		{
+			name: "returns chore for dependency files",
+			diff: strings.Join([]string{
+				"diff --git a/go.mod b/go.mod",
+				"index 1111111..2222222 100644",
+			}, "\n"),
+			expected: TypeChore,
 		},
 	}
 
