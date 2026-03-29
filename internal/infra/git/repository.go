@@ -2,6 +2,7 @@ package git
 
 import (
 	"os/exec"
+	"sort"
 	"strings"
 )
 
@@ -37,7 +38,17 @@ func (repository Repository) ListStagedFiles() ([]string, error) {
 }
 
 func (repository Repository) ListChangedFiles() ([]string, error) {
-	return repository.listFiles("diff", "--name-only", "--diff-filter=MD")
+	changedFiles, err := repository.listFiles("diff", "--name-only", "--diff-filter=MD")
+	if err != nil {
+		return nil, err
+	}
+
+	untrackedFiles, err := repository.listFiles("ls-files", "--others", "--exclude-standard")
+	if err != nil {
+		return nil, err
+	}
+
+	return mergeFileLists(changedFiles, untrackedFiles), nil
 }
 
 func (repository Repository) StageFiles(paths []string) error {
@@ -110,4 +121,24 @@ func splitLines(content string) []string {
 	}
 
 	return result
+}
+
+func mergeFileLists(groups ...[]string) []string {
+	seen := map[string]bool{}
+	merged := []string{}
+
+	for _, group := range groups {
+		for _, entry := range group {
+			trimmedEntry := strings.TrimSpace(entry)
+			if trimmedEntry == "" || seen[trimmedEntry] {
+				continue
+			}
+
+			seen[trimmedEntry] = true
+			merged = append(merged, trimmedEntry)
+		}
+	}
+
+	sort.Strings(merged)
+	return merged
 }
