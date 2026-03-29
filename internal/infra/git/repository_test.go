@@ -30,6 +30,37 @@ func TestRepositoryGetDiff(t *testing.T) {
 	}
 }
 
+func TestRepositoryIsRepository(t *testing.T) {
+	t.Parallel()
+
+	repository := Repository{
+		runCommand: func(name string, args ...string) ([]byte, error) {
+			expectedArgs := []string{"rev-parse", "--is-inside-work-tree"}
+			if name != "git" {
+				t.Fatalf("expected git command, got %s", name)
+			}
+			if len(args) != len(expectedArgs) {
+				t.Fatalf("unexpected args: %v", args)
+			}
+			for index, expectedArg := range expectedArgs {
+				if args[index] != expectedArg {
+					t.Fatalf("unexpected arg at %d: %v", index, args)
+				}
+			}
+
+			return []byte("true\n"), nil
+		},
+	}
+
+	ok, err := repository.IsRepository()
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if !ok {
+		t.Fatal("expected repository to be detected")
+	}
+}
+
 func TestRepositoryGetDiffWithPaths(t *testing.T) {
 	t.Parallel()
 

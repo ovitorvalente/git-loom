@@ -32,6 +32,14 @@ func TestRepositoryWithRealGitRepository(t *testing.T) {
 		},
 	}
 
+	ok, err := repository.IsRepository()
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if !ok {
+		t.Fatal("expected git repository to be detected")
+	}
+
 	if err := repository.StageFiles([]string{"file-a.txt", "file-b.txt"}); err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
