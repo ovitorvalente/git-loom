@@ -37,13 +37,16 @@ func TestCommitCommandDryRun(t *testing.T) {
 	if len(gitRepository.CommitPathsCalls) != 0 {
 		t.Fatalf("expected no commit calls, got %d", len(gitRepository.CommitPathsCalls))
 	}
-	if !strings.Contains(output.String(), "bloco 1/1") {
+	if !strings.Contains(output.String(), "commit 1/1") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
-	if !strings.Contains(output.String(), "mensagem: feat(cli): adicionar comando commit") {
+	if !strings.Contains(output.String(), "mensagem: feat(cli): adicionar fluxo de commit") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
 	if !strings.Contains(output.String(), "adiciona comando commit em cli") {
+		t.Fatalf("unexpected output: %q", output.String())
+	}
+	if !strings.Contains(output.String(), "qualidade:") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
 }
@@ -138,6 +141,71 @@ func TestCommitCommandSplitsCommitsInBlocksOfFour(t *testing.T) {
 	}
 }
 
+func TestCommitCommandPreviewShowsDiffImpact(t *testing.T) {
+	t.Parallel()
+
+	output := &bytes.Buffer{}
+	gitRepository := &mocks.GitRepository{
+		ListStagedFilesFunc: func() ([]string, error) {
+			return []string{"internal/cli/commit.go"}, nil
+		},
+		GetDiffFunc: func(paths ...string) (string, error) {
+			return strings.Join([]string{
+				"diff --git a/internal/cli/commit.go b/internal/cli/commit.go",
+				"new file mode 100644",
+				"+++ b/internal/cli/commit.go",
+				"+package cli",
+				"+func run() {}",
+			}, "\n"), nil
+		},
+	}
+
+	command := newCommitCommandWithDependencies(commitDependencies{
+		gitRepository: gitRepository,
+		aiProvider:    &mocks.AIProvider{},
+	})
+
+	command.SetOut(output)
+	command.SetErr(output)
+	command.SetArgs([]string{"--preview"})
+
+	err := command.Execute()
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if !strings.Contains(output.String(), "preview:") {
+		t.Fatalf("unexpected output: %q", output.String())
+	}
+	if !strings.Contains(output.String(), "+2 linha(s)") {
+		t.Fatalf("unexpected output: %q", output.String())
+	}
+}
+
+func TestCommitCommandStrictFailsForLowQualityPlan(t *testing.T) {
+	t.Parallel()
+
+	command := newCommitCommandWithDependencies(commitDependencies{
+		gitRepository: &mocks.GitRepository{
+			ListStagedFilesFunc: func() ([]string, error) {
+				return []string{"internal/domain/unknown.go"}, nil
+			},
+			GetDiffFunc: func(paths ...string) (string, error) {
+				return "diff --git a/internal/domain/unknown.go b/internal/domain/unknown.go\nindex 1111111..2222222 100644\n", nil
+			},
+		},
+		aiProvider: &mocks.AIProvider{},
+	})
+	command.SetArgs([]string{"--strict", "--dry-run"})
+
+	err := command.Execute()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "modo estrito falhou") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestCommitCommandCancelsWithoutConfirmation(t *testing.T) {
 	t.Parallel()
 
@@ -210,6 +278,30 @@ func TestCommitCommandShowsHelpfulEmptyDiffError(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	if err.Error() != "nenhuma mudanca staged encontrada; execute git add antes de gitloom commit" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestCommitCommandRejectsPartiallyStagedFiles(t *testing.T) {
+	t.Parallel()
+
+	command := newCommitCommandWithDependencies(commitDependencies{
+		gitRepository: &mocks.GitRepository{
+			ListStagedFilesFunc: func() ([]string, error) {
+				return []string{"internal/cli/commit.go"}, nil
+			},
+			ListChangedFilesFunc: func() ([]string, error) {
+				return []string{"internal/cli/commit.go"}, nil
+			},
+		},
+		aiProvider: &mocks.AIProvider{},
+	})
+
+	err := command.Execute()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if err.Error() != "arquivos parcialmente staged ainda nao sao suportados neste fluxo automatico; finalize ou descarte as mudancas unstaged antes de continuar" {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

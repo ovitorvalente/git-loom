@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -22,8 +24,10 @@ type commitDependencies struct {
 }
 
 type commitOptions struct {
-	dryRun bool
-	yes    bool
+	dryRun  bool
+	yes     bool
+	preview bool
+	strict  bool
 }
 
 type commitConfig struct {
@@ -59,6 +63,8 @@ func newCommitCommandWithDependencies(dependencies commitDependencies) *cobra.Co
 
 	command.Flags().BoolVar(&options.dryRun, "dry-run", false, shared.MessageDryRunFlag)
 	command.Flags().BoolVar(&options.yes, "yes", false, shared.MessageYesFlag)
+	command.Flags().BoolVar(&options.preview, "preview", false, shared.MessagePreviewFlag)
+	command.Flags().BoolVar(&options.strict, "strict", false, shared.MessageStrictFlag)
 	return command
 }
 
@@ -69,26 +75,59 @@ func runCommitCommand(command *cobra.Command, dependencies commitDependencies, o
 		return err
 	}
 
-	plans, err := service.PlanCommits(selectedPaths, app.GenerateCommitOptions{
+	review, err := service.PlanCommits(selectedPaths, app.GenerateCommitOptions{
 		Scope: dependencies.config.DefaultScope,
 	})
 	if err != nil {
 		return err
 	}
 
-	for index, plan := range plans {
-		formattedOutput := ui.FormatCommitPlan(index+1, len(plans), plan.Result)
+	if shouldAutoApplySuggestions(options, dependencies.config, review.Suggestions) {
+		review, err = service.ApplySuggestions(review, app.GenerateCommitOptions{
+			Scope: dependencies.config.DefaultScope,
+		})
+		if err != nil {
+			return err
+		}
+	} else if shouldAskToApplySuggestions(options, dependencies.config, review.Suggestions) {
+		printSuggestions(command, review.Suggestions)
+		confirmed, err := ui.ConfirmCommit(command.InOrStdin(), command.OutOrStdout(), shared.MessageApplySuggestions)
+		if err != nil {
+			return err
+		}
+		if confirmed {
+			review, err = service.ApplySuggestions(review, app.GenerateCommitOptions{
+				Scope: dependencies.config.DefaultScope,
+			})
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	for index, plan := range review.Plans {
+		formattedOutput := ui.FormatCommitPlan(index+1, len(review.Plans), plan, options.preview)
 		if _, err := fmt.Fprintf(command.OutOrStdout(), "%s\n", formattedOutput); err != nil {
 			return err
 		}
 	}
 
-	if options.dryRun {
+	if len(review.Suggestions) > 0 {
+		printSuggestions(command, review.Suggestions)
+	}
+
+	if options.strict {
+		if err := validateStrictReview(review); err != nil {
+			return err
+		}
+	}
+
+	if options.dryRun || options.preview {
 		return nil
 	}
 
 	if shouldSkipConfirmation(options, dependencies.config) {
-		return createPlannedCommits(command, dependencies.gitRepository, plans, true)
+		return createPlannedCommits(command, dependencies.gitRepository, review.Plans, true)
 	}
 
 	confirmed, err := ui.ConfirmCommit(command.InOrStdin(), command.OutOrStdout(), shared.MessageCommitPlanQuestion)
@@ -100,11 +139,27 @@ func runCommitCommand(command *cobra.Command, dependencies commitDependencies, o
 		return err
 	}
 
-	return createPlannedCommits(command, dependencies.gitRepository, plans, false)
+	return createPlannedCommits(command, dependencies.gitRepository, review.Plans, false)
 }
 
 func shouldSkipConfirmation(options commitOptions, configuration commitConfig) bool {
 	return options.yes || configuration.AutoConfirm
+}
+
+func shouldAutoApplySuggestions(options commitOptions, configuration commitConfig, suggestions []app.CommitSuggestion) bool {
+	if !hasAutoApplicableSuggestions(suggestions) {
+		return false
+	}
+
+	return options.yes || configuration.AutoConfirm
+}
+
+func shouldAskToApplySuggestions(options commitOptions, configuration commitConfig, suggestions []app.CommitSuggestion) bool {
+	if !hasAutoApplicableSuggestions(suggestions) {
+		return false
+	}
+
+	return !shouldSkipConfirmation(options, configuration)
 }
 
 func createPlannedCommits(command *cobra.Command, gitRepository interfaces.GitRepository, plans []app.CommitPlan, autoApprove bool) error {
@@ -141,6 +196,38 @@ func createPlannedCommits(command *cobra.Command, gitRepository interfaces.GitRe
 	return nil
 }
 
+func hasAutoApplicableSuggestions(suggestions []app.CommitSuggestion) bool {
+	for _, suggestion := range suggestions {
+		if suggestion.AutoApplicable {
+			return true
+		}
+	}
+
+	return false
+}
+
+func printSuggestions(command *cobra.Command, suggestions []app.CommitSuggestion) {
+	formattedSuggestions := ui.FormatSuggestions(suggestions)
+	if formattedSuggestions == "" {
+		return
+	}
+
+	_, _ = fmt.Fprintf(command.OutOrStdout(), "%s\n", formattedSuggestions)
+}
+
+func validateStrictReview(review app.CommitReview) error {
+	for _, plan := range review.Plans {
+		if plan.Quality.Score < 80 {
+			return fmt.Errorf("%s: %s", shared.MessageStrictModeFailed, strings.TrimSpace(plan.Result.Message))
+		}
+		if len(plan.Result.Paths) > 4 {
+			return fmt.Errorf("%s: %s", shared.MessageStrictModeFailed, strings.TrimSpace(plan.Result.Message))
+		}
+	}
+
+	return nil
+}
+
 func prepareCommitPaths(command *cobra.Command, dependencies commitDependencies, options commitOptions) ([]string, error) {
 	stagedPaths, err := dependencies.gitRepository.ListStagedFiles()
 	if err != nil {
@@ -153,6 +240,10 @@ func prepareCommitPaths(command *cobra.Command, dependencies commitDependencies,
 	}
 
 	if len(changedPaths) > 0 {
+		if hasPartiallyStagedFiles(stagedPaths, changedPaths) {
+			return nil, errors.New(shared.MessagePartialStage)
+		}
+
 		if _, err := fmt.Fprintln(command.OutOrStdout(), ui.FormatChangedFiles(changedPaths)); err != nil {
 			return nil, err
 		}
@@ -175,6 +266,16 @@ func prepareCommitPaths(command *cobra.Command, dependencies commitDependencies,
 	}
 
 	return selectedPaths, nil
+}
+
+func hasPartiallyStagedFiles(stagedPaths []string, changedPaths []string) bool {
+	for _, changedPath := range changedPaths {
+		if slices.Contains(stagedPaths, changedPath) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func confirmStageChangedFiles(command *cobra.Command, dependencies commitDependencies, options commitOptions) (bool, error) {
