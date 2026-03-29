@@ -46,6 +46,9 @@ func TestCommitCommandDryRun(t *testing.T) {
 	if !strings.Contains(output.String(), "feat(cli): adicionar fluxo de commit") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
+	if !strings.Contains(output.String(), "detalhes:") {
+		t.Fatalf("unexpected output: %q", output.String())
+	}
 	if !strings.Contains(output.String(), "[") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
@@ -60,7 +63,7 @@ func TestCommitCommandStagesChangedFilesWhenConfirmed(t *testing.T) {
 			return []string{"internal/cli/commit.go"}, nil
 		},
 		ListChangedFilesFunc: func() ([]string, error) {
-			return []string{"internal/app/commit_service.go"}, nil
+			return []string{"internal/app/commit_service.go", "internal/ui/renderer.go"}, nil
 		},
 		GetDiffFunc: func(paths ...string) (string, error) {
 			if len(paths) == 1 && paths[0] == "internal/app/commit_service.go" {
@@ -88,6 +91,12 @@ func TestCommitCommandStagesChangedFilesWhenConfirmed(t *testing.T) {
 	}
 	if !strings.Contains(output.String(), "arquivos alterados") {
 		t.Fatalf("unexpected output: %q", output.String())
+	}
+	if !strings.Contains(output.String(), "changes:") {
+		t.Fatalf("unexpected output: %q", output.String())
+	}
+	if len(gitRepository.StageFilesCalls[0]) != 2 {
+		t.Fatalf("expected two changed files staged, got %d", len(gitRepository.StageFilesCalls[0]))
 	}
 }
 
@@ -183,6 +192,9 @@ func TestCommitCommandPreviewShowsDiffImpact(t *testing.T) {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
 	if !strings.Contains(output.String(), "linhas: +2 -0") {
+		t.Fatalf("unexpected output: %q", output.String())
+	}
+	if !strings.Contains(output.String(), "detalhes:") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
 }
