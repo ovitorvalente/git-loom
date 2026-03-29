@@ -108,6 +108,8 @@ func shouldSkipConfirmation(options commitOptions, configuration commitConfig) b
 }
 
 func createPlannedCommits(command *cobra.Command, gitRepository interfaces.GitRepository, plans []app.CommitPlan, autoApprove bool) error {
+	createdCommits := 0
+
 	for index, plan := range plans {
 		confirmed, err := confirmPlannedCommit(command, index+1, len(plans), autoApprove)
 		if err != nil {
@@ -125,6 +127,13 @@ func createPlannedCommits(command *cobra.Command, gitRepository interfaces.GitRe
 		}
 
 		if _, err := fmt.Fprintf(command.OutOrStdout(), shared.MessageCommitCreated+"\n", strings.TrimSpace(plan.Result.Message)); err != nil {
+			return err
+		}
+		createdCommits++
+	}
+
+	if createdCommits > 0 {
+		if _, err := fmt.Fprintf(command.OutOrStdout(), "\n%s\n", ui.FormatCommitConclusion()); err != nil {
 			return err
 		}
 	}
