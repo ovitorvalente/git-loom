@@ -37,16 +37,16 @@ func TestCommitCommandDryRun(t *testing.T) {
 	if len(gitRepository.CommitPathsCalls) != 0 {
 		t.Fatalf("expected no commit calls, got %d", len(gitRepository.CommitPathsCalls))
 	}
-	if !strings.Contains(output.String(), "commit 1/1") {
+	if !strings.Contains(output.String(), "◆ feat(cli)") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
-	if !strings.Contains(output.String(), "mensagem: feat(cli): adicionar fluxo de commit") {
+	if !strings.Contains(output.String(), "mensagem:") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
-	if !strings.Contains(output.String(), "adiciona comando commit em cli") {
+	if !strings.Contains(output.String(), "feat(cli): adicionar fluxo de commit") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
-	if !strings.Contains(output.String(), "qualidade:") {
+	if !strings.Contains(output.String(), "[") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
 }
@@ -86,7 +86,7 @@ func TestCommitCommandStagesChangedFilesWhenConfirmed(t *testing.T) {
 	if len(gitRepository.StageFilesCalls) != 1 {
 		t.Fatalf("expected one stage call, got %d", len(gitRepository.StageFilesCalls))
 	}
-	if !strings.Contains(output.String(), "arquivos em changes") {
+	if !strings.Contains(output.String(), "arquivos alterados") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
 }
@@ -103,6 +103,9 @@ func TestCommitCommandSplitsCommitsInBlocksOfFour(t *testing.T) {
 		"internal/cli/e.go",
 	}
 	gitRepository := &mocks.GitRepository{
+		ListChangedFilesFunc: func() ([]string, error) {
+			return nil, nil
+		},
 		ListStagedFilesFunc: func() ([]string, error) {
 			return paths, nil
 		},
@@ -136,7 +139,10 @@ func TestCommitCommandSplitsCommitsInBlocksOfFour(t *testing.T) {
 	if len(gitRepository.CommitPathsCalls[1].Paths) != 1 {
 		t.Fatalf("expected second block with one file, got %d", len(gitRepository.CommitPathsCalls[1].Paths))
 	}
-	if !strings.Contains(output.String(), "fluxo finalizado com sucesso") {
+	if !strings.Contains(output.String(), "✔ 2 commits criados") {
+		t.Fatalf("unexpected output: %q", output.String())
+	}
+	if !strings.Contains(output.String(), "qualidade media:") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
 }
@@ -176,7 +182,53 @@ func TestCommitCommandPreviewShowsDiffImpact(t *testing.T) {
 	if !strings.Contains(output.String(), "preview:") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
-	if !strings.Contains(output.String(), "+2 linha(s)") {
+	if !strings.Contains(output.String(), "linhas: +2 -0") {
+		t.Fatalf("unexpected output: %q", output.String())
+	}
+}
+
+func TestCommitCommandVerboseShowsExpandedDetails(t *testing.T) {
+	t.Parallel()
+
+	output := &bytes.Buffer{}
+	gitRepository := &mocks.GitRepository{
+		ListStagedFilesFunc: func() ([]string, error) {
+			return []string{"internal/cli/commit.go", "internal/ui/renderer.go"}, nil
+		},
+		GetDiffFunc: func(paths ...string) (string, error) {
+			return strings.Join([]string{
+				"diff --git a/internal/cli/commit.go b/internal/cli/commit.go",
+				"index 1111111..2222222 100644",
+				"+++ b/internal/cli/commit.go",
+				"+package cli",
+				"diff --git a/internal/ui/renderer.go b/internal/ui/renderer.go",
+				"new file mode 100644",
+				"+++ b/internal/ui/renderer.go",
+				"+package ui",
+			}, "\n"), nil
+		},
+	}
+
+	command := newCommitCommandWithDependencies(commitDependencies{
+		gitRepository: gitRepository,
+		aiProvider:    &mocks.AIProvider{},
+	})
+
+	command.SetOut(output)
+	command.SetErr(output)
+	command.SetArgs([]string{"--dry-run", "--verbose", "--preview"})
+
+	err := command.Execute()
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if !strings.Contains(output.String(), "verbose:") {
+		t.Fatalf("unexpected output: %q", output.String())
+	}
+	if !strings.Contains(output.String(), "impacto: +2 -0") {
+		t.Fatalf("unexpected output: %q", output.String())
+	}
+	if !strings.Contains(output.String(), "internal/ui/renderer.go") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
 }
