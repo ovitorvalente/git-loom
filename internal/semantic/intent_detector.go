@@ -116,6 +116,12 @@ func normalizeIntentTarget(scope string, path string) string {
 		return "planejamento de commits"
 	case strings.HasSuffix(path, "prompts.go"):
 		return "prompts do cli"
+	case strings.HasSuffix(path, "renderer.go"):
+		return "renderer do cli"
+	case strings.HasSuffix(path, "commit_view.go"):
+		return "visao de commit"
+	case strings.HasSuffix(path, "summary_view.go"):
+		return "resumo do cli"
 	case strings.HasSuffix(path, "output.go"):
 		return "layout do cli"
 	case strings.HasSuffix(path, "repository.go"):
