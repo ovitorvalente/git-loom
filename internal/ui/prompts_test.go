@@ -49,6 +49,9 @@ func TestConfirmCommit(t *testing.T) {
 			if confirmed != testCase.expected {
 				t.Fatalf("expected %v, got %v", testCase.expected, confirmed)
 			}
+			if !strings.Contains(output.String(), "\n") {
+				t.Fatalf("expected prompt to start on a new line, got %q", output.String())
+			}
 			if !strings.Contains(output.String(), "criar commit? [y/N]: ") {
 				t.Fatalf("unexpected prompt output: %q", output.String())
 			}
