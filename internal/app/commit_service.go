@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"strconv"
@@ -116,6 +117,11 @@ func (service CommitService) PlanCommits(paths []string, options ...GenerateComm
 		}
 	}
 
+	plans, err := service.optimizePlans(plans, commitOptions)
+	if err != nil {
+		return CommitReview{}, err
+	}
+
 	review := CommitReview{
 		Plans: plans,
 	}
@@ -147,6 +153,11 @@ func (service CommitService) ApplySuggestions(review CommitReview, options ...Ge
 			Context:       context,
 			SemanticGroup: semantic.BuildGroupingKey(string(result.Commit.Type), context),
 		})
+	}
+
+	plans, err := service.optimizePlans(plans, commitOptions)
+	if err != nil {
+		return CommitReview{}, err
 	}
 
 	optimizedReview := CommitReview{
@@ -337,6 +348,145 @@ func canMergePlans(left CommitPlan, right CommitPlan) bool {
 	}
 
 	return semantic.NormalizeScopeFromFiles(left.Context.Files) == semantic.NormalizeScopeFromFiles(right.Context.Files)
+}
+
+func (service CommitService) optimizePlans(plans []CommitPlan, options GenerateCommitOptions) ([]CommitPlan, error) {
+	if len(plans) < 2 {
+		return plans, nil
+	}
+
+	groupedPaths := make([][]string, 0, len(plans))
+	groupAnchors := make([]CommitPlan, 0, len(plans))
+	for _, plan := range plans {
+		if len(groupedPaths) == 0 {
+			groupedPaths = append(groupedPaths, append([]string(nil), plan.Result.Paths...))
+			groupAnchors = append(groupAnchors, plan)
+			continue
+		}
+
+		lastIndex := len(groupedPaths) - 1
+		lastGroup := groupedPaths[lastIndex]
+		if shouldAttachSupportPlan(lastGroup, plan, groupAnchors[lastIndex]) {
+			lastGroup = append(lastGroup, plan.Result.Paths...)
+			sort.Strings(lastGroup)
+			groupedPaths[lastIndex] = lastGroup
+			continue
+		}
+		if shouldAttachSupportPlan(append([]string(nil), plan.Result.Paths...), groupAnchors[lastIndex], plan) {
+			mergedGroup := append(append([]string(nil), plan.Result.Paths...), lastGroup...)
+			sort.Strings(mergedGroup)
+			groupedPaths[lastIndex] = mergedGroup
+			groupAnchors[lastIndex] = plan
+			continue
+		}
+
+		groupedPaths = append(groupedPaths, append([]string(nil), plan.Result.Paths...))
+		groupAnchors = append(groupAnchors, plan)
+	}
+
+	optimized := make([]CommitPlan, 0, len(groupedPaths))
+	for _, group := range groupedPaths {
+		result, err := service.GenerateCommitForPaths(group, options)
+		if err != nil {
+			return nil, err
+		}
+
+		context := semantic.NewCommitContext(result.Diff)
+		intent := semantic.DetectIntent(string(result.Commit.Type), context)
+		optimized = append(optimized, CommitPlan{
+			Result:        result,
+			Preview:       semantic.BuildPreview(context),
+			Quality:       semantic.ScoreCommit(intent, context),
+			Context:       context,
+			SemanticGroup: semantic.BuildGroupingKey(string(result.Commit.Type), context),
+		})
+	}
+
+	return optimized, nil
+}
+
+func shouldAttachSupportPlan(currentGroup []string, support CommitPlan, primary CommitPlan) bool {
+	if len(currentGroup)+len(support.Result.Paths) > 4 {
+		return false
+	}
+	if !isSupportPlan(support) {
+		return false
+	}
+	if isSupportPlan(primary) && !isPrimaryPlan(support) {
+		return false
+	}
+
+	return samePlanArea(primary, support)
+}
+
+func isSupportPlan(plan CommitPlan) bool {
+	if len(plan.Result.Paths) != 1 {
+		return false
+	}
+
+	switch plan.Result.Commit.Type {
+	case domaincommit.TypeTest, domaincommit.TypeDocs, domaincommit.TypeChore:
+		return true
+	default:
+		return false
+	}
+}
+
+func isPrimaryPlan(plan CommitPlan) bool {
+	return !isSupportPlan(plan)
+}
+
+func samePlanArea(left CommitPlan, right CommitPlan) bool {
+	return dominantArea(left.Result.Paths) != "" && dominantArea(left.Result.Paths) == dominantArea(right.Result.Paths)
+}
+
+func dominantArea(paths []string) string {
+	if len(paths) == 0 {
+		return ""
+	}
+
+	votes := map[string]int{}
+	for _, path := range paths {
+		votes[normalizeAreaPath(path)]++
+	}
+
+	selected := ""
+	selectedVotes := 0
+	for area, count := range votes {
+		if count > selectedVotes || (count == selectedVotes && area < selected) {
+			selected = area
+			selectedVotes = count
+		}
+	}
+
+	return selected
+}
+
+func normalizeAreaPath(path string) string {
+	directory := filepath.Dir(path)
+	base := filepath.Base(path)
+	extension := filepath.Ext(base)
+	name := strings.TrimSuffix(base, extension)
+	name = strings.TrimSuffix(name, "_test")
+
+	if directory == "." || directory == "" {
+		return name
+	}
+
+	switch {
+	case strings.HasPrefix(path, "internal/ui/"):
+		return "internal/ui"
+	case strings.HasPrefix(path, "internal/cli/"):
+		return "internal/cli/" + name
+	case strings.HasPrefix(path, "internal/shared/"):
+		return "internal/shared"
+	case strings.HasPrefix(path, "internal/semantic/"):
+		return "internal/semantic"
+	case strings.HasPrefix(path, "internal/domain/commit/"):
+		return "internal/domain/commit/" + name
+	default:
+		return directory + "/" + name
+	}
 }
 
 func deduplicateSuggestions(suggestions []CommitSuggestion) []CommitSuggestion {
