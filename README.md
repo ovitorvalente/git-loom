@@ -42,6 +42,30 @@ cd git-loom
 go build -o gitloom ./cmd/gitloom
 ```
 
+## Help
+
+O CLI agora possui ajuda embutida mais forte:
+
+```bash
+gitloom help
+gitloom help commit
+```
+
+O help do `commit` descreve:
+
+- fluxo completo de planejamento e confirmacao
+- exemplos reais de uso
+- flags disponiveis
+- configuracao suportada por `.gitloom.yaml`
+
+Tambem existem comandos auxiliares:
+
+```bash
+gitloom analyze
+gitloom config init
+gitloom version
+```
+
 ## Uso
 
 ```bash
@@ -73,6 +97,26 @@ Para falhar quando o plano estiver fraco semanticamente:
 gitloom commit --strict
 ```
 
+Para revisar o plano sem criar commits:
+
+```bash
+gitloom analyze
+gitloom analyze --optimize
+gitloom analyze --json
+```
+
+Para gerar uma configuracao inicial:
+
+```bash
+gitloom config init
+```
+
+Para inspecionar versao e metadata de build:
+
+```bash
+gitloom version
+```
+
 ## Exemplo de fluxo
 
 ```bash
@@ -80,23 +124,25 @@ git add internal/cli/commit.go
 gitloom commit
 ```
 
-Saída esperada:
+Saida esperada:
 
 ```text
-◆ commit 1/1  [feat]  (qualidade: 92/100)
-  resumo: 1 arquivo(s) | 1 detalhe(s) | impacto: +12/-3
-✦ commit gerado
-  • tipo: feat
-  • escopo: cli
-  • intencao: deixar o fluxo mais claro e previsivel
-  • descricao: adicionar fluxo de commit
-  › mensagem: feat(cli): adicionar fluxo de commit
-  ✧ detalhes:
-    - adiciona comando commit em cli
-  ✧ arquivos:
-    ◦ internal/cli/commit.go
+────────────────────────────────────────────────────────────
+◆ feat(cli) [92] excelente
 
-> criar commits planejados? [y/N]:
+mensagem:
+feat(cli): adicionar fluxo de commit
+
+detalhes:
+• adiciona comando commit em cli
+
+arquivos:
++12 -3 internal/cli/commit.go
+
+analise:
+ok sem alertas relevantes
+
+> criar commits planejados? [Y/n]:
 ```
 
 ## Configuração
@@ -109,6 +155,12 @@ commit:
 
 cli:
   auto_confirm: false
+```
+
+Voce tambem pode gerar esse arquivo automaticamente com:
+
+```bash
+gitloom config init
 ```
 
 ## Regras de commit
