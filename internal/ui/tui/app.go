@@ -30,31 +30,21 @@ type appModel struct {
 	width   int
 	height  int
 	ready   bool
-	err     error
 
 	// analyze
 	analyzing bool
-	tickCount int
 
 	// review
 	commits   []CommitToggle
 	cursor    int
 	confirmed bool
 	cancelled bool
-
-	// summary
-	created  int
-	avgScore int
-	status   string
 }
 
 type AppResult struct {
 	Approved  []bool
 	Confirmed bool
 	Cancelled bool
-	Created   int
-	AvgScore  int
-	Status    string
 }
 
 func newAppModel(plans []app.CommitPlan) appModel {
