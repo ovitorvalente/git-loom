@@ -10,14 +10,20 @@ func newRootCommand() *cobra.Command {
 	command := &cobra.Command{
 		Use:           "gitloom",
 		Short:         shared.MessageRootShort,
+		Long:          rootHelpText(),
+		Example:       rootExamples(),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		CompletionOptions: cobra.CompletionOptions{
 			DisableDefaultCmd: true,
 		},
 	}
+	command.SetHelpTemplate(rootHelpTemplate)
 
 	command.AddCommand(newCommitCommand())
+	command.AddCommand(newAnalyzeCommand())
+	command.AddCommand(newConfigCommand())
+	command.AddCommand(newVersionCommand())
 	return command
 }
 
