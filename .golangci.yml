@@ -1,0 +1,36 @@
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - gosimple
+    - ineffassign
+    - typecheck
+    - misspell
+    - gofmt
+    - goimports
+    - revive
+
+linters-settings:
+  revive:
+    rules:
+      - name: exported
+        severity: warning
+
+  misspell:
+    locale: US
+
+  govet:
+    enable-all: true
+
+issues:
+  exclude-dirs:
+    - vendor
+    - dist
+    - .cache
+
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
