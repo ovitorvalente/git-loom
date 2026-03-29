@@ -15,6 +15,7 @@ import (
 	"github.com/ovitorvalente/git-loom/internal/interfaces"
 	"github.com/ovitorvalente/git-loom/internal/shared"
 	"github.com/ovitorvalente/git-loom/internal/ui"
+	"github.com/ovitorvalente/git-loom/internal/ui/tui"
 )
 
 type commitDependencies struct {
@@ -123,6 +124,23 @@ func runCommitCommand(command *cobra.Command, dependencies commitDependencies, o
 	}
 
 	if options.dryRun || options.review.preview {
+		if !options.review.json && len(review.Plans) > 1 {
+			result, err := tui.SelectCommits(review.Plans)
+			if err != nil {
+				return err
+			}
+			if result.Cancelled {
+				_, err := fmt.Fprintln(command.OutOrStdout(), shared.MessageCommitCanceled)
+				return err
+			}
+			selectedCount := 0
+			for _, approved := range result.Approved {
+				if approved {
+					selectedCount++
+				}
+			}
+			fmt.Fprintf(command.OutOrStdout(), "\n  %d/%d commits selecionados (dry-run, nenhum commit criado)\n", selectedCount, len(review.Plans))
+		}
 		return nil
 	}
 
@@ -169,41 +187,80 @@ func createPlannedCommits(command *cobra.Command, gitRepository interfaces.GitRe
 	skipped := []jsonSkippedCommit{}
 	plans := review.Plans
 
-	if !asJSON && len(plans) > 1 {
-		ui.PrintStatus(command.OutOrStdout(), fmt.Sprintf("criando %d commits...", len(plans)))
-	}
-
-	for index, plan := range plans {
-		confirmed, err := confirmPlannedCommit(command, index+1, len(plans), autoApprove)
+	if !asJSON && !autoApprove && len(plans) > 1 {
+		result, err := tui.SelectCommits(plans)
 		if err != nil {
 			return err
 		}
-		if !confirmed {
-			if !asJSON {
-				if _, err := fmt.Fprintf(command.OutOrStdout(), shared.MessageIgnoredBlock+"\n", index+1); err != nil {
-					return err
-				}
-			}
-			skipped = append(skipped, jsonSkippedCommit{Index: index + 1})
-			continue
-		}
-
-		if err := gitRepository.CommitPaths(plan.Result.Message, plan.Result.Paths); err != nil {
+		if result.Cancelled {
+			_, err := fmt.Fprintln(command.OutOrStdout(), shared.MessageCommitCanceled)
 			return err
 		}
 
-		if !asJSON {
-			if _, err := fmt.Fprintf(command.OutOrStdout(), shared.MessageCommitCreated+"\n", strings.TrimSpace(plan.Result.Message)); err != nil {
+		for index, plan := range plans {
+			if !result.Approved[index] {
+				if !asJSON {
+					if _, err := fmt.Fprintf(command.OutOrStdout(), shared.MessageIgnoredBlock+"\n", index+1); err != nil {
+						return err
+					}
+				}
+				skipped = append(skipped, jsonSkippedCommit{Index: index + 1})
+				continue
+			}
+
+			if err := gitRepository.CommitPaths(plan.Result.Message, plan.Result.Paths); err != nil {
 				return err
 			}
+			if !asJSON {
+				if _, err := fmt.Fprintf(command.OutOrStdout(), shared.MessageCommitCreated+"\n", strings.TrimSpace(plan.Result.Message)); err != nil {
+					return err
+				}
+			}
+			createdCommits++
+			totalScore += plan.Quality.Score
+			created = append(created, jsonCreatedCommit{
+				Index:   index + 1,
+				Message: strings.TrimSpace(plan.Result.Message),
+				Paths:   append([]string(nil), plan.Result.Paths...),
+			})
 		}
-		createdCommits++
-		totalScore += plan.Quality.Score
-		created = append(created, jsonCreatedCommit{
-			Index:   index + 1,
-			Message: strings.TrimSpace(plan.Result.Message),
-			Paths:   append([]string(nil), plan.Result.Paths...),
-		})
+	} else {
+		if !asJSON && len(plans) > 1 {
+			ui.PrintStatus(command.OutOrStdout(), fmt.Sprintf("criando %d commits...", len(plans)))
+		}
+
+		for index, plan := range plans {
+			confirmed, err := confirmPlannedCommit(command, index+1, len(plans), autoApprove)
+			if err != nil {
+				return err
+			}
+			if !confirmed {
+				if !asJSON {
+					if _, err := fmt.Fprintf(command.OutOrStdout(), shared.MessageIgnoredBlock+"\n", index+1); err != nil {
+						return err
+					}
+				}
+				skipped = append(skipped, jsonSkippedCommit{Index: index + 1})
+				continue
+			}
+
+			if err := gitRepository.CommitPaths(plan.Result.Message, plan.Result.Paths); err != nil {
+				return err
+			}
+
+			if !asJSON {
+				if _, err := fmt.Fprintf(command.OutOrStdout(), shared.MessageCommitCreated+"\n", strings.TrimSpace(plan.Result.Message)); err != nil {
+					return err
+				}
+			}
+			createdCommits++
+			totalScore += plan.Quality.Score
+			created = append(created, jsonCreatedCommit{
+				Index:   index + 1,
+				Message: strings.TrimSpace(plan.Result.Message),
+				Paths:   append([]string(nil), plan.Result.Paths...),
+			})
+		}
 	}
 
 	if createdCommits > 0 {
