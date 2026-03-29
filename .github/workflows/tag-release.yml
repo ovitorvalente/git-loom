@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Versao no formato vX.Y.Z"
-        required: true
+        description: "Versao manual (ex: v1.2.3). Deixe vazio para auto-detectar via conventional commits."
+        required: false
         type: string
 
 permissions:
@@ -20,21 +20,71 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Validate version
+      - name: Auto-detect version
+        id: version
         run: |
-          version="${{ github.event.inputs.version }}"
-          case "$version" in
-            v*) ;;
-            *) echo "version precisa comecar com v"; exit 1 ;;
-          esac
+          INPUT_VERSION="${{ github.event.inputs.version }}"
 
-      - name: Ensure tag does not exist
+          if [ -n "$INPUT_VERSION" ]; then
+            # Versao manual
+            case "$INPUT_VERSION" in
+              v*) ;;
+              *) INPUT_VERSION="v${INPUT_VERSION}" ;;
+            esac
+            echo "version=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
+            echo "source=manual" >> "$GITHUB_OUTPUT"
+          else
+            # Auto-detect via conventional commits
+            PREV_TAG=$(git tag --sort=-v:refname | grep '^v' | head -1)
+            if [ -z "$PREV_TAG" ]; then
+              PREV_TAG="v0.0.0"
+              RANGE="HEAD"
+            else
+              RANGE="${PREV_TAG}..HEAD"
+            fi
+
+            # Extrair versao atual
+            MAJOR=$(echo "$PREV_TAG" | sed 's/^v//' | cut -d. -f1)
+            MINOR=$(echo "$PREV_TAG" | sed 's/^v//' | cut -d. -f2)
+            PATCH=$(echo "$PREV_TAG" | sed 's/^v//' | cut -d. -f3)
+
+            # Verificar breaking changes
+            HAS_BREAKING=$(git log --pretty=format:"%s" $RANGE | grep -ciE "BREAKING CHANGE|^[a-z]+(\(.+\))?!:" || true)
+
+            # Verificar features
+            HAS_FEAT=$(git log --pretty=format:"%s" $RANGE | grep -ciE "^feat" || true)
+
+            if [ "$HAS_BREAKING" -gt 0 ]; then
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+            elif [ "$HAS_FEAT" -gt 0 ]; then
+              MINOR=$((MINOR + 1))
+              PATCH=0
+            else
+              PATCH=$((PATCH + 1))
+            fi
+
+            NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+
+            # Verificar se ja existe
+            if git rev-parse "$NEW_VERSION" >/dev/null 2>&1; then
+              echo "ERROR: Tag $NEW_VERSION ja existe. Nenhum commit novo desde a ultima release."
+              exit 1
+            fi
+
+            echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+            echo "source=auto" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Show version
         run: |
-          git rev-parse "${{ github.event.inputs.version }}" >/dev/null 2>&1 && exit 1 || exit 0
+          echo "Version: ${{ steps.version.outputs.version }}"
+          echo "Source: ${{ steps.version.outputs.source }}"
 
       - name: Create and push tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag "${{ github.event.inputs.version }}"
-          git push origin "${{ github.event.inputs.version }}"
+          git tag "${{ steps.version.outputs.version }}"
+          git push origin "${{ steps.version.outputs.version }}"
