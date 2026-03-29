@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/ovitorvalente/git-loom/internal/app"
+	"github.com/ovitorvalente/git-loom/internal/semantic"
 	"github.com/ovitorvalente/git-loom/internal/shared"
 )
 
@@ -19,6 +20,7 @@ func FormatCommitResult(result app.CommitResult) string {
 		colorizeLine(accentColor, "✦ "+shared.MessageCommitGenerated),
 		formatMetaLine("•", shared.MessageTypeLabel, fmt.Sprint(result.Commit.Type), typeColor(result.Commit.Type)),
 		formatMetaLine("•", shared.MessageScopeLabel, formatValue(result.Commit.Scope), mutatedColor),
+		formatMetaLine("•", shared.MessageIntentLabel, formatValue(result.Commit.Intent), accentColor),
 		formatMetaLine("•", shared.MessageDescriptionLabel, formatValue(result.Commit.Description), defaultColor),
 		formatMetaLine("›", shared.MessageHeaderLabel, header, headerColor),
 	}
@@ -31,17 +33,28 @@ func FormatCommitResult(result app.CommitResult) string {
 	return strings.Join(lines, "\n")
 }
 
-func FormatCommitPlan(index int, total int, result app.CommitResult) string {
+func FormatCommitPlan(index int, total int, plan app.CommitPlan, showPreview bool) string {
+	scoreSummary := fmt.Sprintf("%s: %d/100", shared.MessageQualityLabel, plan.Quality.Score)
 	lines := []string{
 		colorizeLine(borderColor, horizontalRule()),
-		colorizeLine(accentColor, "◆ "+fmt.Sprintf(shared.MessageBlockLabel, index, total)),
-		colorizeLine(mutatedColor, "  "+formatPlanSummary(result)),
-		FormatCommitResult(result),
+		colorizeLine(accentColor, fmt.Sprintf("◆ %s  [%s]  (%s)", fmt.Sprintf(shared.MessageCommitLabel, index, total), plan.Result.Commit.Type, scoreSummary)),
+		colorizeLine(mutatedColor, "  "+formatPlanSummary(plan)),
+		FormatCommitResult(plan.Result),
 	}
 
-	if len(result.Paths) > 0 {
+	if showPreview {
+		lines = append(lines, colorizeLine(accentColor, fmt.Sprintf("  ✧ %s:", shared.MessagePreviewLabel)))
+		lines = append(lines, indentBody(formatPreview(plan.Preview)))
+	}
+
+	if len(plan.Quality.Reasons) > 0 {
+		lines = append(lines, colorizeLine(accentColor, fmt.Sprintf("  ✧ %s:", shared.MessageQualityLabel)))
+		lines = append(lines, indentBody(formatReasons(plan.Quality.Reasons)))
+	}
+
+	if len(plan.Result.Paths) > 0 {
 		lines = append(lines, colorizeLine(accentColor, fmt.Sprintf("  ✧ %s:", shared.MessageFilesLabel)))
-		lines = append(lines, indentBody(formatPaths(result.Paths)))
+		lines = append(lines, indentBody(formatPaths(plan.Result.Paths)))
 	}
 
 	return strings.Join(lines, "\n")
@@ -63,6 +76,23 @@ func FormatCommitConclusion() string {
 		colorizeLine(borderColor, horizontalRule()),
 		colorizeLine(successColor, "✔ "+shared.MessageCommitFinished),
 		colorizeLine(accentColor, "☕ "+shared.MessageCommitFarewell),
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func FormatSuggestions(suggestions []app.CommitSuggestion) string {
+	if len(suggestions) == 0 {
+		return ""
+	}
+
+	lines := []string{
+		colorizeLine(borderColor, horizontalRule()),
+		colorizeLine(accentColor, "✦ "+shared.MessageSuggestionsLabel),
+	}
+
+	for index, suggestion := range suggestions {
+		lines = append(lines, colorizeLine(defaultColor, fmt.Sprintf("  %d. %s", index+1, suggestion.Message)))
 	}
 
 	return strings.Join(lines, "\n")
@@ -115,9 +145,9 @@ const (
 	dangerColor  = "31"
 )
 
-func formatPlanSummary(result app.CommitResult) string {
-	detailsCount := countDetails(result.Commit.Body)
-	return fmt.Sprintf("resumo: %d arquivo(s) | %d detalhe(s)", len(result.Paths), detailsCount)
+func formatPlanSummary(plan app.CommitPlan) string {
+	detailsCount := countDetails(plan.Result.Commit.Body)
+	return fmt.Sprintf("resumo: %d arquivo(s) | %d detalhe(s) | %s: +%d/-%d", len(plan.Result.Paths), detailsCount, shared.MessageImpactLabel, plan.Preview.Additions, plan.Preview.Deletions)
 }
 
 func countDetails(body string) int {
@@ -164,4 +194,17 @@ func useANSIColors() bool {
 
 func formatMetaLine(icon string, label string, value string, color string) string {
 	return colorizeLine(color, fmt.Sprintf("  %s %s: %s", icon, label, value))
+}
+
+func formatPreview(preview semantic.CommitPreview) string {
+	return fmt.Sprintf("%d arquivo(s) alterado(s)\n+%d linha(s)\n-%d linha(s)", preview.FilesChanged, preview.Additions, preview.Deletions)
+}
+
+func formatReasons(reasons []string) string {
+	lines := make([]string, 0, len(reasons))
+	for _, reason := range reasons {
+		lines = append(lines, "- "+reason)
+	}
+
+	return strings.Join(lines, "\n")
 }
