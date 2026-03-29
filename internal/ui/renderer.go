@@ -23,12 +23,6 @@ type Renderer struct {
 	options RenderOptions
 }
 
-type CommitSummary struct {
-	Created        int
-	AverageQuality int
-	Status         string
-}
-
 func NewRenderer(options RenderOptions) Renderer {
 	if options.Mode == "" {
 		options.Mode = RenderModeClean
@@ -58,28 +52,29 @@ func (renderer Renderer) withPreview() bool {
 }
 
 const (
-	borderColor        = "90"
-	accentColor        = "36"
-	headerColor        = "33"
-	defaultColor       = "37"
-	mutatedColor       = "94"
-	successColor       = "32"
-	warningColor       = "33"
-	dangerColor        = "31"
-	emphasisColor      = "96"
-	infoColor          = "34"
-	magentaColor       = "35"
-	panelBackground    = "48;5;53"
-	panelBorderColor   = "38;5;203"
-	panelTextColor     = "38;5;230"
-	mutedCapsColor     = "37"
-	statusAddColor     = "32"
-	statusUpdateColor  = "33"
-	statusRemoveColor  = "31"
-	statusPromptColor  = "36"
-	labelColor         = "38;5;109"
-	typeValueColor     = "38;5;45"
-	scopeValueColor    = "38;5;219"
+	borderColor       = "90"
+	accentColor       = "36"
+	headerColor       = "33"
+	defaultColor      = "37"
+	mutatedColor      = "94"
+	mutedColor        = "90"
+	successColor      = "32"
+	warningColor      = "33"
+	dangerColor       = "31"
+	emphasisColor     = "96"
+	infoColor         = "34"
+	magentaColor      = "35"
+	panelBackground   = "48;5;53"
+	panelBorderColor  = "38;5;203"
+	panelTextColor    = "38;5;230"
+	mutedCapsColor    = "37"
+	statusAddColor    = "32"
+	statusUpdateColor = "33"
+	statusRemoveColor = "31"
+	statusPromptColor = "36"
+	labelColor        = "38;5;109"
+	typeValueColor    = "38;5;45"
+	scopeValueColor   = "38;5;219"
 )
 
 func colorizeLine(color string, line string) string {
