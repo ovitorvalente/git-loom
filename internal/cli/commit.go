@@ -257,7 +257,7 @@ func prepareCommitPaths(command *cobra.Command, dependencies commitDependencies,
 		}
 
 		renderer := ui.NewRenderer(ui.RenderOptions{Mode: renderMode(options)})
-		if _, err := fmt.Fprintln(command.OutOrStdout(), renderer.ChangedFiles(changedPaths)); err != nil {
+		if _, err := fmt.Fprintln(command.OutOrStdout(), renderer.ChangedFiles(stagedPaths, changedPaths)); err != nil {
 			return nil, err
 		}
 
