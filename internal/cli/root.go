@@ -1,11 +1,15 @@
 package cli
 
-import "github.com/spf13/cobra"
+import (
+	"github.com/spf13/cobra"
+
+	"github.com/ovitorvalente/git-loom/internal/shared"
+)
 
 func newRootCommand() *cobra.Command {
 	command := &cobra.Command{
 		Use:           "gitloom",
-		Short:         "Automatiza fluxos de trabalho com Git",
+		Short:         shared.MessageRootShort,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}

@@ -11,6 +11,7 @@ import (
 	infraconfig "github.com/ovitorvalente/git-loom/internal/infra/config"
 	infragit "github.com/ovitorvalente/git-loom/internal/infra/git"
 	"github.com/ovitorvalente/git-loom/internal/interfaces"
+	"github.com/ovitorvalente/git-loom/internal/shared"
 	"github.com/ovitorvalente/git-loom/internal/ui"
 )
 
@@ -50,14 +51,14 @@ func newCommitCommandWithDependencies(dependencies commitDependencies) *cobra.Co
 	options := commitOptions{}
 	command := &cobra.Command{
 		Use:   "commit",
-		Short: "Gera uma mensagem de commit a partir das mudancas staged",
+		Short: shared.MessageCommitShort,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runCommitCommand(cmd, dependencies, options)
 		},
 	}
 
-	command.Flags().BoolVar(&options.dryRun, "dry-run", false, "mostra a mensagem gerada sem criar o commit")
-	command.Flags().BoolVar(&options.yes, "yes", false, "cria o commit sem pedir confirmacao")
+	command.Flags().BoolVar(&options.dryRun, "dry-run", false, shared.MessageDryRunFlag)
+	command.Flags().BoolVar(&options.yes, "yes", false, shared.MessageYesFlag)
 	return command
 }
 
@@ -87,32 +88,43 @@ func runCommitCommand(command *cobra.Command, dependencies commitDependencies, o
 	}
 
 	if shouldSkipConfirmation(options, dependencies.config) {
-		return createPlannedCommits(command, dependencies.gitRepository, plans)
+		return createPlannedCommits(command, dependencies.gitRepository, plans, true)
 	}
 
-	confirmed, err := ui.ConfirmCommit(command.InOrStdin(), command.OutOrStdout(), "criar commits planejados?")
+	confirmed, err := ui.ConfirmCommit(command.InOrStdin(), command.OutOrStdout(), shared.MessageCommitPlanQuestion)
 	if err != nil {
 		return err
 	}
 	if !confirmed {
-		_, err = fmt.Fprintln(command.OutOrStdout(), "commit cancelado")
+		_, err = fmt.Fprintln(command.OutOrStdout(), shared.MessageCommitCanceled)
 		return err
 	}
 
-	return createPlannedCommits(command, dependencies.gitRepository, plans)
+	return createPlannedCommits(command, dependencies.gitRepository, plans, false)
 }
 
 func shouldSkipConfirmation(options commitOptions, configuration commitConfig) bool {
 	return options.yes || configuration.AutoConfirm
 }
 
-func createPlannedCommits(command *cobra.Command, gitRepository interfaces.GitRepository, plans []app.CommitPlan) error {
-	for _, plan := range plans {
+func createPlannedCommits(command *cobra.Command, gitRepository interfaces.GitRepository, plans []app.CommitPlan, autoApprove bool) error {
+	for index, plan := range plans {
+		confirmed, err := confirmPlannedCommit(command, index+1, len(plans), autoApprove)
+		if err != nil {
+			return err
+		}
+		if !confirmed {
+			if _, err := fmt.Fprintf(command.OutOrStdout(), shared.MessageIgnoredBlock+"\n", index+1); err != nil {
+				return err
+			}
+			continue
+		}
+
 		if err := gitRepository.CommitPaths(plan.Result.Message, plan.Result.Paths); err != nil {
 			return err
 		}
 
-		if _, err := fmt.Fprintf(command.OutOrStdout(), "commit criado: %s\n", strings.TrimSpace(plan.Result.Message)); err != nil {
+		if _, err := fmt.Fprintf(command.OutOrStdout(), shared.MessageCommitCreated+"\n", strings.TrimSpace(plan.Result.Message)); err != nil {
 			return err
 		}
 	}
@@ -158,10 +170,22 @@ func prepareCommitPaths(command *cobra.Command, dependencies commitDependencies,
 
 func confirmStageChangedFiles(command *cobra.Command, dependencies commitDependencies, options commitOptions) (bool, error) {
 	if shouldSkipConfirmation(options, dependencies.config) {
-		return false, nil
+		return true, nil
 	}
 
-	return ui.ConfirmCommit(command.InOrStdin(), command.OutOrStdout(), "adicionar arquivos em changes ao staged?")
+	return ui.ConfirmCommit(command.InOrStdin(), command.OutOrStdout(), shared.MessageStageChangedQuestion)
+}
+
+func confirmPlannedCommit(command *cobra.Command, index int, total int, autoApprove bool) (bool, error) {
+	if autoApprove || total == 1 {
+		return true, nil
+	}
+
+	return ui.ConfirmCommit(
+		command.InOrStdin(),
+		command.OutOrStdout(),
+		fmt.Sprintf(shared.MessageCreateBlockQuestion, index, total),
+	)
 }
 
 func uniquePaths(paths []string) []string {
