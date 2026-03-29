@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/ovitorvalente/git-loom/internal/app"
+	"github.com/ovitorvalente/git-loom/internal/shared"
 )
 
 func (renderer Renderer) ChangedFiles(stagedPaths []string, changedPaths []string) string {
@@ -21,7 +22,7 @@ func (renderer Renderer) ChangedFiles(stagedPaths []string, changedPaths []strin
 	}
 
 	if len(changedPaths) > 0 {
-		lines = append(lines, "", renderer.sectionTitle("changes"))
+		lines = append(lines, "", renderer.sectionTitle(fmt.Sprintf("changes (%d)", len(changedPaths))))
 		for _, path := range changedPaths {
 			lines = append(lines, renderer.bulletLine("•", path))
 		}
@@ -53,6 +54,7 @@ func (renderer Renderer) CommitSummary(summary CommitSummary) string {
 		colorizeLine(successColor, fmt.Sprintf("✔ %d %s", summary.Created, pluralizeCommits(summary.Created))),
 		colorizeLine(defaultColor, fmt.Sprintf("qualidade media: %d", summary.AverageQuality)),
 		colorizeLine(defaultColor, "status: "+strings.TrimSpace(summary.Status)),
+		colorizeLine(accentColor, "☕ "+shared.MessageCommitFarewell),
 	}
 
 	return strings.Join(lines, "\n")

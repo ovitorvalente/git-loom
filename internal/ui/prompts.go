@@ -23,5 +23,5 @@ func ConfirmCommit(input io.Reader, output io.Writer, question string) (bool, er
 	}
 
 	normalizedAnswer := strings.ToLower(strings.TrimSpace(answer))
-	return normalizedAnswer == "y" || normalizedAnswer == "yes", nil
+	return normalizedAnswer == "" || normalizedAnswer == "y" || normalizedAnswer == "yes", nil
 }
