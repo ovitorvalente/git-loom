@@ -177,3 +177,31 @@ func TestCommitServicePlanCommits(t *testing.T) {
 		t.Fatal("expected quality score to be calculated")
 	}
 }
+
+func TestCommitServicePlanCommitsMergesSupportFilesIntoPrimaryArea(t *testing.T) {
+	t.Parallel()
+
+	service := NewCommitService(&mocks.GitRepository{
+		GetDiffFunc: func(paths ...string) (string, error) {
+			lines := []string{}
+			for _, path := range paths {
+				lines = append(lines, "diff --git a/"+path+" b/"+path, "index 1111111..2222222 100644")
+			}
+			return strings.Join(lines, "\n"), nil
+		},
+	}, &mocks.AIProvider{})
+
+	review, err := service.PlanCommits([]string{
+		"internal/cli/commit.go",
+		"internal/cli/commit_test.go",
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if len(review.Plans) != 1 {
+		t.Fatalf("expected one merged plan, got %d", len(review.Plans))
+	}
+	if len(review.Plans[0].Result.Paths) != 2 {
+		t.Fatalf("expected merged plan with two files, got %d", len(review.Plans[0].Result.Paths))
+	}
+}
