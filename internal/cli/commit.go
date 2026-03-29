@@ -73,8 +73,8 @@ func newCommitCommandWithDependencies(dependencies commitDependencies) *cobra.Co
 }
 
 func runCommitCommand(command *cobra.Command, dependencies commitDependencies, options commitOptions) error {
-	if options.review.json && !options.dryRun {
-		return fmt.Errorf("--json requer --dry-run no comando commit; use `gitloom analyze --json` para revisar sem commitar")
+	if options.review.json && !options.dryRun && !shouldSkipConfirmation(options, dependencies.config) {
+		return fmt.Errorf("--json no fluxo de commit requer --yes ou auto_confirm; use `gitloom analyze --json` para revisar sem executar")
 	}
 
 	service := app.NewCommitService(dependencies.gitRepository, dependencies.aiProvider)
@@ -116,8 +116,10 @@ func runCommitCommand(command *cobra.Command, dependencies commitDependencies, o
 		}
 	}
 
-	if err := printReview(command, execution, options.review); err != nil {
-		return err
+	if !options.review.json || options.dryRun || options.review.preview {
+		if err := printReview(command, execution, options.review); err != nil {
+			return err
+		}
 	}
 
 	if options.dryRun || options.review.preview {
@@ -125,7 +127,7 @@ func runCommitCommand(command *cobra.Command, dependencies commitDependencies, o
 	}
 
 	if shouldSkipConfirmation(options, dependencies.config) {
-		return createPlannedCommits(command, dependencies.gitRepository, renderer, review.Plans, true)
+		return createPlannedCommits(command, dependencies.gitRepository, renderer, review, options.review.json, true)
 	}
 
 	confirmed, err := ui.ConfirmCommit(command.InOrStdin(), command.OutOrStdout(), shared.MessageCommitPlanQuestion)
@@ -137,7 +139,7 @@ func runCommitCommand(command *cobra.Command, dependencies commitDependencies, o
 		return err
 	}
 
-	return createPlannedCommits(command, dependencies.gitRepository, renderer, review.Plans, false)
+	return createPlannedCommits(command, dependencies.gitRepository, renderer, review, options.review.json, false)
 }
 
 func shouldSkipConfirmation(options commitOptions, configuration commitConfig) bool {
@@ -160,9 +162,12 @@ func shouldAskToApplySuggestions(options commitOptions, configuration commitConf
 	return !shouldSkipConfirmation(options, configuration)
 }
 
-func createPlannedCommits(command *cobra.Command, gitRepository interfaces.GitRepository, renderer ui.Renderer, plans []app.CommitPlan, autoApprove bool) error {
+func createPlannedCommits(command *cobra.Command, gitRepository interfaces.GitRepository, renderer ui.Renderer, review app.CommitReview, asJSON bool, autoApprove bool) error {
 	createdCommits := 0
 	totalScore := 0
+	created := []jsonCreatedCommit{}
+	skipped := []jsonSkippedCommit{}
+	plans := review.Plans
 
 	for index, plan := range plans {
 		confirmed, err := confirmPlannedCommit(command, index+1, len(plans), autoApprove)
@@ -170,9 +175,12 @@ func createPlannedCommits(command *cobra.Command, gitRepository interfaces.GitRe
 			return err
 		}
 		if !confirmed {
-			if _, err := fmt.Fprintf(command.OutOrStdout(), shared.MessageIgnoredBlock+"\n", index+1); err != nil {
-				return err
+			if !asJSON {
+				if _, err := fmt.Fprintf(command.OutOrStdout(), shared.MessageIgnoredBlock+"\n", index+1); err != nil {
+					return err
+				}
 			}
+			skipped = append(skipped, jsonSkippedCommit{Index: index + 1})
 			continue
 		}
 
@@ -180,11 +188,18 @@ func createPlannedCommits(command *cobra.Command, gitRepository interfaces.GitRe
 			return err
 		}
 
-		if _, err := fmt.Fprintf(command.OutOrStdout(), shared.MessageCommitCreated+"\n", strings.TrimSpace(plan.Result.Message)); err != nil {
-			return err
+		if !asJSON {
+			if _, err := fmt.Fprintf(command.OutOrStdout(), shared.MessageCommitCreated+"\n", strings.TrimSpace(plan.Result.Message)); err != nil {
+				return err
+			}
 		}
 		createdCommits++
 		totalScore += plan.Quality.Score
+		created = append(created, jsonCreatedCommit{
+			Index:   index + 1,
+			Message: strings.TrimSpace(plan.Result.Message),
+			Paths:   append([]string(nil), plan.Result.Paths...),
+		})
 	}
 
 	if createdCommits > 0 {
@@ -192,7 +207,34 @@ func createPlannedCommits(command *cobra.Command, gitRepository interfaces.GitRe
 		if err != nil {
 			return err
 		}
-		if _, err := fmt.Fprintf(command.OutOrStdout(), "\n%s\n", renderer.CommitSummary(summary)); err != nil {
+		if asJSON {
+			payload, err := buildJSONCommitExecutionOutput(review, jsonCommitExecutionSummary{
+				CreatedCommits: created,
+				SkippedCommits: skipped,
+				AverageQuality: totalScore / createdCommits,
+				Status:         summary.Status,
+			})
+			if err != nil {
+				return err
+			}
+			if _, err := fmt.Fprintln(command.OutOrStdout(), payload); err != nil {
+				return err
+			}
+		} else {
+			if _, err := fmt.Fprintf(command.OutOrStdout(), "\n%s\n", renderer.CommitSummary(summary)); err != nil {
+				return err
+			}
+		}
+	} else if asJSON {
+		payload, err := buildJSONCommitExecutionOutput(review, jsonCommitExecutionSummary{
+			CreatedCommits: created,
+			SkippedCommits: skipped,
+			Status:         buildWorkingTreeStatus(nil, nil),
+		})
+		if err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(command.OutOrStdout(), payload); err != nil {
 			return err
 		}
 	}

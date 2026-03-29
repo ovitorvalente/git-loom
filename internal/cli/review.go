@@ -31,6 +31,13 @@ type jsonReviewOutput struct {
 	Summary     *jsonReviewSummaryOutput `json:"summary,omitempty"`
 }
 
+type jsonCommitExecutionOutput struct {
+	Plans       []jsonPlanOutput           `json:"plans"`
+	Suggestions []app.CommitSuggestion     `json:"suggestions,omitempty"`
+	Summary     *jsonReviewSummaryOutput   `json:"summary,omitempty"`
+	Execution   jsonCommitExecutionSummary `json:"execution"`
+}
+
 type jsonPlanOutput struct {
 	Index       int                `json:"index"`
 	Total       int                `json:"total"`
@@ -49,6 +56,23 @@ type jsonReviewSummaryOutput struct {
 	AverageQuality  int `json:"average_quality"`
 	ChangedFiles    int `json:"changed_files"`
 	SuggestionCount int `json:"suggestion_count"`
+}
+
+type jsonCommitExecutionSummary struct {
+	CreatedCommits []jsonCreatedCommit `json:"created_commits,omitempty"`
+	SkippedCommits []jsonSkippedCommit `json:"skipped_commits,omitempty"`
+	AverageQuality int                 `json:"average_quality"`
+	Status         string              `json:"status"`
+}
+
+type jsonCreatedCommit struct {
+	Index   int      `json:"index"`
+	Message string   `json:"message"`
+	Paths   []string `json:"paths"`
+}
+
+type jsonSkippedCommit struct {
+	Index int `json:"index"`
 }
 
 func executeReview(command *cobra.Command, dependencies commitDependencies, options reviewOptions) (reviewExecution, error) {
@@ -122,13 +146,39 @@ func printReview(command *cobra.Command, execution reviewExecution, options revi
 
 func buildJSONReviewOutput(review app.CommitReview) (string, error) {
 	output := jsonReviewOutput{
-		Plans:       make([]jsonPlanOutput, 0, len(review.Plans)),
+		Plans:       buildJSONPlanOutputs(review),
 		Suggestions: review.Suggestions,
 		Summary:     buildJSONReviewSummary(review),
 	}
 
+	formatted, err := json.MarshalIndent(output, "", "  ")
+	if err != nil {
+		return "", err
+	}
+
+	return string(formatted), nil
+}
+
+func buildJSONCommitExecutionOutput(review app.CommitReview, execution jsonCommitExecutionSummary) (string, error) {
+	output := jsonCommitExecutionOutput{
+		Plans:       buildJSONPlanOutputs(review),
+		Suggestions: review.Suggestions,
+		Summary:     buildJSONReviewSummary(review),
+		Execution:   execution,
+	}
+
+	formatted, err := json.MarshalIndent(output, "", "  ")
+	if err != nil {
+		return "", err
+	}
+
+	return string(formatted), nil
+}
+
+func buildJSONPlanOutputs(review app.CommitReview) []jsonPlanOutput {
+	plans := make([]jsonPlanOutput, 0, len(review.Plans))
 	for index, plan := range review.Plans {
-		output.Plans = append(output.Plans, jsonPlanOutput{
+		plans = append(plans, jsonPlanOutput{
 			Index:       index + 1,
 			Total:       len(review.Plans),
 			Message:     strings.TrimSpace(plan.Result.Message),
@@ -141,13 +191,7 @@ func buildJSONReviewOutput(review app.CommitReview) (string, error) {
 			Feedback:    app.BuildCommitFeedback(plan),
 		})
 	}
-
-	formatted, err := json.MarshalIndent(output, "", "  ")
-	if err != nil {
-		return "", err
-	}
-
-	return string(formatted), nil
+	return plans
 }
 
 func buildJSONReviewSummary(review app.CommitReview) *jsonReviewSummaryOutput {
