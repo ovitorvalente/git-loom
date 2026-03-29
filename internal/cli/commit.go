@@ -24,11 +24,9 @@ type commitDependencies struct {
 }
 
 type commitOptions struct {
-	dryRun  bool
-	yes     bool
-	preview bool
-	strict  bool
-	verbose bool
+	dryRun bool
+	yes    bool
+	review reviewOptions
 }
 
 type commitConfig struct {
@@ -55,8 +53,14 @@ func newCommitCommand() *cobra.Command {
 func newCommitCommandWithDependencies(dependencies commitDependencies) *cobra.Command {
 	options := commitOptions{}
 	command := &cobra.Command{
-		Use:   "commit",
-		Short: shared.MessageCommitShort,
+		Use:           "commit",
+		Aliases:       []string{"ci"},
+		Short:         shared.MessageCommitShort,
+		Long:          commitHelpText(),
+		Example:       commitExamples(),
+		Args:          cobra.NoArgs,
+		SilenceUsage:  true,
+		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runCommitCommand(cmd, dependencies, options)
 		},
@@ -64,29 +68,22 @@ func newCommitCommandWithDependencies(dependencies commitDependencies) *cobra.Co
 
 	command.Flags().BoolVar(&options.dryRun, "dry-run", false, shared.MessageDryRunFlag)
 	command.Flags().BoolVar(&options.yes, "yes", false, shared.MessageYesFlag)
-	command.Flags().BoolVar(&options.preview, "preview", false, shared.MessagePreviewFlag)
-	command.Flags().BoolVar(&options.strict, "strict", false, shared.MessageStrictFlag)
-	command.Flags().BoolVar(&options.verbose, "verbose", false, shared.MessageVerboseFlag)
+	addReviewFlags(command, &options.review, false)
 	return command
 }
 
 func runCommitCommand(command *cobra.Command, dependencies commitDependencies, options commitOptions) error {
-	service := app.NewCommitService(dependencies.gitRepository, dependencies.aiProvider)
-	renderer := ui.NewRenderer(ui.RenderOptions{
-		Mode:        renderMode(options),
-		ShowPreview: options.preview,
-	})
-	selectedPaths, err := prepareCommitPaths(command, dependencies, options)
-	if err != nil {
-		return err
+	if options.review.json && !options.dryRun {
+		return fmt.Errorf("--json requer --dry-run no comando commit; use `gitloom analyze --json` para revisar sem commitar")
 	}
 
-	review, err := service.PlanCommits(selectedPaths, app.GenerateCommitOptions{
-		Scope: dependencies.config.DefaultScope,
-	})
+	service := app.NewCommitService(dependencies.gitRepository, dependencies.aiProvider)
+	execution, err := executeReview(command, dependencies, options.review)
 	if err != nil {
 		return err
 	}
+	review := execution.review
+	renderer := execution.renderer
 
 	if shouldAutoApplySuggestions(options, dependencies.config, review.Suggestions) {
 		review, err = service.ApplySuggestions(review, app.GenerateCommitOptions{
@@ -95,6 +92,7 @@ func runCommitCommand(command *cobra.Command, dependencies commitDependencies, o
 		if err != nil {
 			return err
 		}
+		execution.review = review
 	} else if shouldAskToApplySuggestions(options, dependencies.config, review.Suggestions) {
 		printSuggestions(command, renderer, review.Suggestions)
 		confirmed, err := ui.ConfirmCommit(command.InOrStdin(), command.OutOrStdout(), shared.MessageApplySuggestions)
@@ -108,27 +106,21 @@ func runCommitCommand(command *cobra.Command, dependencies commitDependencies, o
 			if err != nil {
 				return err
 			}
+			execution.review = review
 		}
 	}
 
-	for index, plan := range review.Plans {
-		formattedOutput := renderer.CommitPlan(index+1, len(review.Plans), plan)
-		if _, err := fmt.Fprintf(command.OutOrStdout(), "%s\n", formattedOutput); err != nil {
-			return err
-		}
-	}
-
-	if len(review.Suggestions) > 0 {
-		printSuggestions(command, renderer, review.Suggestions)
-	}
-
-	if options.strict {
+	if options.review.strict {
 		if err := validateStrictReview(review); err != nil {
 			return err
 		}
 	}
 
-	if options.dryRun || options.preview {
+	if err := printReview(command, execution, options.review); err != nil {
+		return err
+	}
+
+	if options.dryRun || options.review.preview {
 		return nil
 	}
 
@@ -313,7 +305,7 @@ func buildWorkingTreeStatus(stagedPaths []string, changedPaths []string) string 
 }
 
 func renderMode(options commitOptions) ui.RenderMode {
-	if options.verbose {
+	if options.review.verbose {
 		return ui.RenderModeVerbose
 	}
 
