@@ -42,10 +42,10 @@ type testError struct{ msg string }
 
 func (e *testError) Error() string { return e.msg }
 
-func TestSelectCommitsEmptyPlans(t *testing.T) {
+func TestRunCommitTUIEmptyPlans(t *testing.T) {
 	t.Parallel()
 
-	result, err := SelectCommits(nil)
+	result, err := RunCommitTUI(nil)
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -54,7 +54,7 @@ func TestSelectCommitsEmptyPlans(t *testing.T) {
 	}
 }
 
-func TestSelectorModelResult(t *testing.T) {
+func TestNewAppModelResult(t *testing.T) {
 	t.Parallel()
 
 	plans := []app.CommitPlan{
@@ -69,6 +69,11 @@ func TestSelectorModelResult(t *testing.T) {
 				Paths: []string{"internal/cli/commit.go"},
 			},
 			Quality: semantic.CommitQuality{Score: 95},
+			Context: semantic.CommitContext{
+				Files: []semantic.ChangedFile{
+					{Path: "internal/cli/commit.go", Status: "adicionado"},
+				},
+			},
 		},
 		{
 			Result: app.CommitResult{
@@ -81,23 +86,25 @@ func TestSelectorModelResult(t *testing.T) {
 				Paths: []string{"README.md"},
 			},
 			Quality: semantic.CommitQuality{Score: 80},
+			Context: semantic.CommitContext{
+				Files: []semantic.ChangedFile{
+					{Path: "README.md", Status: "atualizado"},
+				},
+			},
 		},
 	}
 
-	m := newSelectorModel(plans)
+	m := newAppModel(plans)
 
-	if len(m.items) != 2 {
-		t.Fatalf("expected 2 items, got %d", len(m.items))
+	if len(m.commits) != 2 {
+		t.Fatalf("expected 2 commits, got %d", len(m.commits))
 	}
-	if m.items[0].commitType != "feat" {
-		t.Fatalf("expected feat, got %s", m.items[0].commitType)
-	}
-	if m.items[1].commitType != "docs" {
-		t.Fatalf("expected docs, got %s", m.items[1].commitType)
+	if m.state != viewAnalyze {
+		t.Fatal("expected initial state to be viewAnalyze")
 	}
 
-	m.items[0].selected = true
-	m.items[1].selected = false
+	m.commits[0].Selected = true
+	m.commits[1].Selected = false
 
 	result := m.result()
 	if len(result.Approved) != 2 {
@@ -111,20 +118,34 @@ func TestSelectorModelResult(t *testing.T) {
 	}
 }
 
-func TestTypeColorDoesNotPanic(t *testing.T) {
+func TestStyleForTypeDoesNotPanic(t *testing.T) {
 	t.Parallel()
 
 	types := []string{"feat", "fix", "refactor", "docs", "test", "chore", "unknown"}
 	for _, tp := range types {
-		_ = TypeColor(tp)
+		_ = StyleForType(tp)
 	}
 }
 
-func TestScoreColorDoesNotPanic(t *testing.T) {
+func TestStyleForScoreDoesNotPanic(t *testing.T) {
 	t.Parallel()
 
 	scores := []int{95, 85, 75, 50}
 	for _, s := range scores {
-		_ = ScoreColor(s)
+		_ = StyleForScore(s)
+	}
+}
+
+func TestScoreBadge(t *testing.T) {
+	t.Parallel()
+
+	badge := ScoreBadge(95)
+	if badge == "" {
+		t.Fatal("expected non-empty badge")
+	}
+
+	badge = ScoreBadge(50)
+	if badge == "" {
+		t.Fatal("expected non-empty badge")
 	}
 }
