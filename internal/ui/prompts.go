@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	"github.com/ovitorvalente/git-loom/internal/shared"
 )
 
 func ConfirmCommit(input io.Reader, output io.Writer, question string) (bool, error) {
-	if _, err := fmt.Fprintf(output, "%s [y/N]: ", question); err != nil {
+	highlightedQuestion := colorizeLine(headerColor, question)
+	if _, err := fmt.Fprintf(output, "\n%s %s %s", colorizeLine(accentColor, "?"), highlightedQuestion, shared.MessageCommitPromptSuffix); err != nil {
 		return false, err
 	}
 
