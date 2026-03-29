@@ -147,34 +147,6 @@ func (renderer Renderer) renderCriteria(criteria []semantic.QualityCriteria) str
 	return strings.Join(lines, "\n")
 }
 
-func (renderer Renderer) renderFiles(plan app.CommitPlan) string {
-	files := plan.Context.Files
-	if len(files) == 0 {
-		for _, path := range plan.Result.Paths {
-			files = append(files, semantic.ChangedFile{Path: path, Status: "atualizado"})
-		}
-	}
-
-	if len(files) == 0 {
-		return colorizeLine(defaultColor, "  nenhum arquivo")
-	}
-
-	if renderer.mode() != RenderModeVerbose && len(files) > 3 {
-		files = files[:3]
-	}
-
-	lines := make([]string, 0, len(files))
-	for _, file := range files {
-		lines = append(lines, renderer.renderFileLine(file))
-	}
-
-	if renderer.mode() != RenderModeVerbose && len(plan.Context.Files) > len(files) {
-		lines = append(lines, colorizeLine(borderColor, fmt.Sprintf("  +%d arquivo(s)", len(plan.Context.Files)-len(files))))
-	}
-
-	return strings.Join(lines, "\n")
-}
-
 func (renderer Renderer) renderAnalysis(highlights []string) string {
 	if len(highlights) == 0 {
 		return ""
@@ -298,48 +270,4 @@ func typeColorFor(commitType string) string {
 	default:
 		return defaultColor
 	}
-}
-
-func wrapLines(lines []string, width int) []string {
-	if width <= 0 {
-		return lines
-	}
-
-	wrapped := []string{}
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			if len(wrapped) == 0 || wrapped[len(wrapped)-1] == "" {
-				continue
-			}
-			wrapped = append(wrapped, "")
-			continue
-		}
-
-		current := ""
-		for _, word := range strings.Fields(trimmed) {
-			candidate := word
-			if current != "" {
-				candidate = current + " " + word
-			}
-			if len(candidate) <= width {
-				current = candidate
-				continue
-			}
-			if current != "" {
-				wrapped = append(wrapped, current)
-			}
-			current = word
-		}
-
-		if current != "" {
-			wrapped = append(wrapped, current)
-		}
-	}
-
-	if len(wrapped) == 0 {
-		return []string{""}
-	}
-
-	return wrapped
 }
