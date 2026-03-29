@@ -133,6 +133,9 @@ func TestCommitCommandSplitsCommitsInBlocksOfFour(t *testing.T) {
 	if len(gitRepository.CommitPathsCalls[1].Paths) != 1 {
 		t.Fatalf("expected second block with one file, got %d", len(gitRepository.CommitPathsCalls[1].Paths))
 	}
+	if !strings.Contains(output.String(), "fluxo finalizado com sucesso") {
+		t.Fatalf("unexpected output: %q", output.String())
+	}
 }
 
 func TestCommitCommandCancelsWithoutConfirmation(t *testing.T) {
