@@ -16,3 +16,7 @@ type CLIConfig struct {
 func DefaultConfig() Config {
 	return Config{}
 }
+
+func RenderDefaultConfig() string {
+	return "commit:\n  scope: \"\"\n\ncli:\n  auto_confirm: false\n"
+}
