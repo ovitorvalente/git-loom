@@ -245,6 +245,89 @@ func TestCommitCommandVerboseShowsExpandedDetails(t *testing.T) {
 	}
 }
 
+func TestCommitCommandJSONDryRunOutput(t *testing.T) {
+	t.Parallel()
+
+	output := &bytes.Buffer{}
+	command := newCommitCommandWithDependencies(commitDependencies{
+		gitRepository: &mocks.GitRepository{
+			ListStagedFilesFunc: func() ([]string, error) {
+				return []string{"internal/cli/commit.go"}, nil
+			},
+			GetDiffFunc: func(paths ...string) (string, error) {
+				return "diff --git a/internal/cli/commit.go b/internal/cli/commit.go\nnew file mode 100644\n", nil
+			},
+		},
+		aiProvider: &mocks.AIProvider{},
+	})
+
+	command.SetOut(output)
+	command.SetErr(output)
+	command.SetArgs([]string{"--dry-run", "--json"})
+
+	err := command.Execute()
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	expectedParts := []string{"\"plans\"", "\"summary\"", "\"type\": \"feat\""}
+	for _, expectedPart := range expectedParts {
+		if !strings.Contains(output.String(), expectedPart) {
+			t.Fatalf("expected output to contain %q, got %q", expectedPart, output.String())
+		}
+	}
+}
+
+func TestCommitCommandJSONExecutionOutput(t *testing.T) {
+	t.Parallel()
+
+	output := &bytes.Buffer{}
+	committed := false
+	command := newCommitCommandWithDependencies(commitDependencies{
+		gitRepository: &mocks.GitRepository{
+			CommitPathsFunc: func(message string, paths []string) error {
+				committed = true
+				return nil
+			},
+			ListStagedFilesFunc: func() ([]string, error) {
+				if committed {
+					return nil, nil
+				}
+				return []string{"internal/cli/commit.go"}, nil
+			},
+			ListChangedFilesFunc: func() ([]string, error) {
+				return nil, nil
+			},
+			GetDiffFunc: func(paths ...string) (string, error) {
+				return "diff --git a/internal/cli/commit.go b/internal/cli/commit.go\nnew file mode 100644\n", nil
+			},
+		},
+		aiProvider: &mocks.AIProvider{},
+	})
+
+	command.SetOut(output)
+	command.SetErr(output)
+	command.SetArgs([]string{"--yes", "--json"})
+
+	err := command.Execute()
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	expectedParts := []string{
+		"\"execution\"",
+		"\"created_commits\"",
+		"\"message\": \"feat(cli): adicionar fluxo de commit",
+		"\"status\": \"working tree limpa\"",
+	}
+	for _, expectedPart := range expectedParts {
+		if !strings.Contains(output.String(), expectedPart) {
+			t.Fatalf("expected output to contain %q, got %q", expectedPart, output.String())
+		}
+	}
+	if strings.Contains(output.String(), "commit criado:") {
+		t.Fatalf("did not expect textual commit output, got %q", output.String())
+	}
+}
+
 func TestCommitCommandStrictFailsForLowQualityPlan(t *testing.T) {
 	t.Parallel()
 
