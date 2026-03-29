@@ -8,9 +8,10 @@ import (
 
 	domaincommit "github.com/ovitorvalente/git-loom/internal/domain/commit"
 	"github.com/ovitorvalente/git-loom/internal/interfaces"
+	"github.com/ovitorvalente/git-loom/internal/shared"
 )
 
-var ErrEmptyDiff = errors.New("nenhuma mudanca staged encontrada; execute git add antes de gitloom commit")
+var ErrEmptyDiff = errors.New(shared.MessageEmptyDiff)
 
 type CommitService struct {
 	git interfaces.GitRepository
