@@ -12,12 +12,13 @@ func TestFormatCommitResult(t *testing.T) {
 	t.Parallel()
 
 	result := app.CommitResult{
-		Message: "feat(core): add commit formatter",
+		Message: "feat(core): adicionar formatter de commit",
 		Commit: domaincommit.Model{
 			Type:        domaincommit.TypeFeat,
 			Scope:       "core",
-			Description: "add commit formatter",
-			Body:        "keep output easy to read",
+			Intent:      "deixar o fluxo mais claro",
+			Description: "adicionar formatter de commit",
+			Body:        "manter o output facil de ler",
 		},
 	}
 
@@ -27,10 +28,11 @@ func TestFormatCommitResult(t *testing.T) {
 		"commit gerado",
 		"tipo: feat",
 		"escopo: core",
-		"descricao: add commit formatter",
-		"mensagem: feat(core): add commit formatter",
+		"intencao: deixar o fluxo mais claro",
+		"descricao: adicionar formatter de commit",
+		"mensagem: feat(core): adicionar formatter de commit",
 		"detalhes:",
-		"keep output easy to read",
+		"manter o output facil de ler",
 	}
 
 	for _, expectedPart := range expectedParts {
@@ -64,21 +66,36 @@ func TestFormatCommitResultWithoutOptionalFields(t *testing.T) {
 func TestFormatCommitPlan(t *testing.T) {
 	t.Parallel()
 
-	result := app.CommitResult{
-		Message: "feat(cli): adicionar commit\n\n- adicionado commit",
-		Commit: domaincommit.Model{
-			Type:        domaincommit.TypeFeat,
-			Scope:       "cli",
-			Description: "adicionar commit",
+	plan := app.CommitPlan{
+		Result: app.CommitResult{
+			Message: "feat(cli): adicionar fluxo de commit\n\n- adiciona comando commit em cli",
+			Commit: domaincommit.Model{
+				Type:        domaincommit.TypeFeat,
+				Scope:       "cli",
+				Intent:      "deixar o fluxo mais claro",
+				Description: "adicionar fluxo de commit",
+			},
+			Paths: []string{"internal/cli/commit.go"},
 		},
-		Paths: []string{"internal/cli/commit.go"},
+		Quality: app.CommitQuality{Score: 91},
+		Preview: app.CommitPreview{
+			FilesChanged: 1,
+			Additions:    12,
+			Deletions:    3,
+		},
 	}
 
-	formattedOutput := FormatCommitPlan(1, 2, result)
-	if !strings.Contains(formattedOutput, "bloco 1/2") {
+	formattedOutput := FormatCommitPlan(1, 2, plan, true)
+	if !strings.Contains(formattedOutput, "commit 1/2") {
 		t.Fatalf("unexpected output: %q", formattedOutput)
 	}
 	if !strings.Contains(formattedOutput, "arquivos:") {
+		t.Fatalf("unexpected output: %q", formattedOutput)
+	}
+	if !strings.Contains(formattedOutput, "qualidade: 91/100") {
+		t.Fatalf("unexpected output: %q", formattedOutput)
+	}
+	if !strings.Contains(formattedOutput, "preview:") {
 		t.Fatalf("unexpected output: %q", formattedOutput)
 	}
 }
@@ -88,6 +105,17 @@ func TestFormatChangedFiles(t *testing.T) {
 
 	formattedOutput := FormatChangedFiles([]string{"internal/app/commit_service.go"})
 	if !strings.Contains(formattedOutput, "arquivos em changes") {
+		t.Fatalf("unexpected output: %q", formattedOutput)
+	}
+}
+
+func TestFormatSuggestions(t *testing.T) {
+	t.Parallel()
+
+	formattedOutput := FormatSuggestions([]app.CommitSuggestion{
+		{Message: "melhorar descricao do commit 1"},
+	})
+	if !strings.Contains(formattedOutput, "sugestoes") {
 		t.Fatalf("unexpected output: %q", formattedOutput)
 	}
 }
