@@ -215,6 +215,14 @@ func SelectCommits(plans []app.CommitPlan) (SelectorResult, error) {
 		return SelectorResult{Confirmed: true}, nil
 	}
 
+	if !isTerminal(os.Stdin) || !isTerminal(os.Stdout) {
+		result := make([]bool, len(plans))
+		for i := range result {
+			result[i] = true
+		}
+		return SelectorResult{Approved: result, Confirmed: true}, nil
+	}
+
 	m := newSelectorModel(plans)
 	p := tea.NewProgram(m, tea.WithInput(os.Stdin), tea.WithOutput(os.Stdout))
 	finalModel, err := p.Run()
