@@ -12,6 +12,7 @@ func newRootCommand() *cobra.Command {
 		Short:         shared.MessageRootShort,
 		Long:          rootHelpText(),
 		Example:       rootExamples(),
+		Aliases:       []string{"gl", "loom"},
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		CompletionOptions: cobra.CompletionOptions{
