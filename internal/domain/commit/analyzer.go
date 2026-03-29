@@ -298,6 +298,12 @@ func detectSpecificTarget(path string) string {
 		return "repositorio"
 	case strings.Contains(path, "prompts.go"):
 		return "prompts"
+	case strings.Contains(path, "renderer.go"):
+		return "renderer"
+	case strings.Contains(path, "commit_view.go"):
+		return "visao de commit"
+	case strings.Contains(path, "summary_view.go"):
+		return "resumo"
 	case strings.Contains(path, "output.go"):
 		return "output"
 	case strings.Contains(path, "_test.go"):
