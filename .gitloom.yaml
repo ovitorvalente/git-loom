@@ -1,1 +1,5 @@
-# Project configuration placeholder.
+commit:
+  scope: ""
+
+cli:
+  auto_confirm: false
