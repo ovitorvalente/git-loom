@@ -218,7 +218,7 @@ func buildCommitModel(diff string, paths []string, options GenerateCommitOptions
 		Type:        commitType,
 		Scope:       scope,
 		Intent:      intent.Intent,
-		Description: firstNonEmpty(intent.Description, analysis.Description, describeFallback(paths)),
+		Description: selectDescription(intent.Description, analysis.Description, scope, paths),
 		Body:        analysis.Body,
 	}
 }
@@ -375,4 +375,62 @@ func describeFallback(paths []string) string {
 	}
 
 	return semantic.NormalizeScope(paths[0])
+}
+
+func selectDescription(intentDescription string, analysisDescription string, scope string, paths []string) string {
+	intentDescription = strings.TrimSpace(intentDescription)
+	analysisDescription = strings.TrimSpace(analysisDescription)
+
+	switch {
+	case intentDescription == "":
+		return firstNonEmpty(analysisDescription, describeFallback(paths))
+	case analysisDescription == "":
+		return firstNonEmpty(intentDescription, describeFallback(paths))
+	case isWeakDescription(intentDescription, scope):
+		return analysisDescription
+	case descriptionSpecificity(analysisDescription) > descriptionSpecificity(intentDescription)+1:
+		return analysisDescription
+	default:
+		return intentDescription
+	}
+}
+
+func isWeakDescription(description string, scope string) bool {
+	normalizedDescription := strings.ToLower(strings.TrimSpace(description))
+	normalizedScope := strings.ToLower(strings.TrimSpace(scope))
+
+	if normalizedDescription == "" {
+		return true
+	}
+
+	weakDescriptions := []string{
+		"corrigir " + normalizedScope,
+		"refinar " + normalizedScope,
+		"atualizar " + normalizedScope,
+		"ajustar " + normalizedScope,
+		"adicionar " + normalizedScope,
+		"cobrir " + normalizedScope,
+		"ajustar testes de " + normalizedScope,
+		"testes de " + normalizedScope,
+		"ajustar testes de testes de " + normalizedScope,
+	}
+
+	for _, weakDescription := range weakDescriptions {
+		if normalizedDescription == strings.TrimSpace(weakDescription) {
+			return true
+		}
+	}
+
+	return strings.Contains(normalizedDescription, "testes de testes de")
+}
+
+func descriptionSpecificity(description string) int {
+	score := 0
+	for _, token := range strings.Fields(strings.ToLower(strings.TrimSpace(description))) {
+		if len(token) >= 4 {
+			score++
+		}
+	}
+
+	return score
 }
