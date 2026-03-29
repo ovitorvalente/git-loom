@@ -51,7 +51,8 @@ func (renderer Renderer) CommitSummary(summary CommitSummary) string {
 	qualityStr := scoreBadge(summary.AverageQuality)
 
 	lines := []string{
-		colorizeLine(successColor, fmt.Sprintf("✔ %d %s", created, label)),
+		"",
+		colorizeLine(successColor, fmt.Sprintf("☕ %d %s", created, label)),
 		"",
 		colorizeLine(defaultColor, "qualidade media: "+qualityStr),
 		colorizeLine(defaultColor, "status: "+strings.TrimSpace(summary.Status)),
