@@ -10,21 +10,20 @@ import (
 
 func (renderer Renderer) ChangedFiles(stagedPaths []string, changedPaths []string) string {
 	lines := []string{
-		colorizeLine(borderColor, horizontalRule()),
-		colorizeLine(headerColor, "◆ arquivos alterados"),
+		colorizeLine(emphasisColor, "Arquivos detectados no working tree"),
 	}
 
 	if len(stagedPaths) > 0 {
-		lines = append(lines, "", renderer.sectionTitle("staged"))
+		lines = append(lines, "", renderer.sectionTitle("Staged"))
 		for _, path := range stagedPaths {
-			lines = append(lines, renderer.bulletLine("•", path))
+			lines = append(lines, colorizeText(panelBorderColor, "│")+" "+colorizeText(statusAddColor, "+")+" "+colorizeText(defaultColor, path))
 		}
 	}
 
 	if len(changedPaths) > 0 {
-		lines = append(lines, "", renderer.sectionTitle(fmt.Sprintf("changes (%d)", len(changedPaths))))
+		lines = append(lines, "", renderer.sectionTitle(fmt.Sprintf("Changes (%d)", len(changedPaths))))
 		for _, path := range changedPaths {
-			lines = append(lines, renderer.bulletLine("•", path))
+			lines = append(lines, colorizeText(panelBorderColor, "│")+" "+colorizeText(statusUpdateColor, "~")+" "+colorizeText(defaultColor, path))
 		}
 	}
 
@@ -37,12 +36,11 @@ func (renderer Renderer) Suggestions(suggestions []app.CommitSuggestion) string 
 	}
 
 	lines := []string{
-		colorizeLine(borderColor, horizontalRule()),
-		colorizeLine(headerColor, "◆ sugestoes"),
+		colorizeLine(emphasisColor, "Sugestoes encontradas"),
 	}
 
 	for _, suggestion := range suggestions {
-		lines = append(lines, renderer.bulletLine("→", suggestion.Message))
+		lines = append(lines, colorizeLine(mutatedColor, "• "+suggestion.Message))
 	}
 
 	return strings.Join(lines, "\n")
@@ -50,11 +48,10 @@ func (renderer Renderer) Suggestions(suggestions []app.CommitSuggestion) string 
 
 func (renderer Renderer) CommitSummary(summary CommitSummary) string {
 	lines := []string{
-		colorizeLine(borderColor, horizontalRule()),
-		colorizeLine(successColor, fmt.Sprintf("✔ %d %s", summary.Created, pluralizeCommits(summary.Created))),
-		colorizeLine(defaultColor, fmt.Sprintf("qualidade media: %d", summary.AverageQuality)),
-		colorizeLine(defaultColor, "status: "+strings.TrimSpace(summary.Status)),
-		colorizeLine(accentColor, "☕ "+shared.MessageCommitFarewell),
+		colorizeLine(successColor, fmt.Sprintf("Commit concluido: %d %s", summary.Created, pluralizeCommits(summary.Created))),
+		colorizeLine(defaultColor, fmt.Sprintf("Qualidade media: %d", summary.AverageQuality)),
+		colorizeLine(defaultColor, "Status: "+strings.TrimSpace(summary.Status)),
+		colorizeLine(accentColor, shared.MessageCommitFarewell),
 	}
 
 	return strings.Join(lines, "\n")

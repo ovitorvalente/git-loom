@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -57,14 +58,28 @@ func (renderer Renderer) withPreview() bool {
 }
 
 const (
-	borderColor  = "90"
-	accentColor  = "36"
-	headerColor  = "33"
-	defaultColor = "37"
-	mutatedColor = "94"
-	successColor = "32"
-	warningColor = "33"
-	dangerColor  = "31"
+	borderColor        = "90"
+	accentColor        = "36"
+	headerColor        = "33"
+	defaultColor       = "37"
+	mutatedColor       = "94"
+	successColor       = "32"
+	warningColor       = "33"
+	dangerColor        = "31"
+	emphasisColor      = "96"
+	infoColor          = "34"
+	magentaColor       = "35"
+	panelBackground    = "48;5;53"
+	panelBorderColor   = "38;5;203"
+	panelTextColor     = "38;5;230"
+	mutedCapsColor     = "37"
+	statusAddColor     = "32"
+	statusUpdateColor  = "33"
+	statusRemoveColor  = "31"
+	statusPromptColor  = "36"
+	labelColor         = "38;5;109"
+	typeValueColor     = "38;5;45"
+	scopeValueColor    = "38;5;219"
 )
 
 func colorizeLine(color string, line string) string {
@@ -81,6 +96,77 @@ func useANSIColors() bool {
 
 func horizontalRule() string {
 	return strings.Repeat("─", 60)
+}
+
+func colorizeText(color string, value string) string {
+	if !useANSIColors() || strings.TrimSpace(color) == "" {
+		return value
+	}
+
+	return "\x1b[" + color + "m" + value + "\x1b[0m"
+}
+
+func padRight(value string, width int) string {
+	if len(value) >= width {
+		return value
+	}
+
+	return value + strings.Repeat(" ", width-len(value))
+}
+
+func max(values ...int) int {
+	result := 0
+	for _, value := range values {
+		if value > result {
+			result = value
+		}
+	}
+
+	return result
+}
+
+func styledPanel(lines []string) string {
+	visibleWidth := 0
+	for _, line := range lines {
+		if len(line) > visibleWidth {
+			visibleWidth = len(line)
+		}
+	}
+
+	if visibleWidth == 0 {
+		return ""
+	}
+
+	panelWidth := visibleWidth + 2
+	output := make([]string, 0, len(lines)+2)
+	topBorder := colorizeText(panelBorderColor, "┌"+strings.Repeat("─", panelWidth)+"┐")
+	bottomBorder := colorizeText(panelBorderColor, "└"+strings.Repeat("─", panelWidth)+"┘")
+	output = append(output, topBorder)
+
+	for _, line := range lines {
+		padded := " " + padRight(line, visibleWidth) + " "
+		body := colorizeText(panelBackground+";"+panelTextColor, padded)
+		output = append(output, colorizeText(panelBorderColor, "│")+body+colorizeText(panelBorderColor, "│"))
+	}
+
+	output = append(output, bottomBorder)
+	return strings.Join(output, "\n")
+}
+
+func scoreText(score int) string {
+	color := successColor
+	switch {
+	case score >= 90:
+		color = successColor
+	case score >= 80:
+		color = accentColor
+	case score >= 70:
+		color = warningColor
+	default:
+		color = dangerColor
+	}
+
+	return colorizeText(color, strconv.Itoa(score)+"/100")
 }
 
 func splitCommitMessage(message string) (string, string) {
