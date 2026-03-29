@@ -145,7 +145,7 @@ func TestCommitCommandSplitsCommitsInBlocksOfFour(t *testing.T) {
 	if len(gitRepository.CommitPathsCalls[1].Paths) != 1 {
 		t.Fatalf("expected second block with one file, got %d", len(gitRepository.CommitPathsCalls[1].Paths))
 	}
-	if !strings.Contains(output.String(), "✔ 2 commits criados") {
+	if !strings.Contains(output.String(), "☕ 2 commits criados") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
 	if !strings.Contains(output.String(), "qualidade media:") {
