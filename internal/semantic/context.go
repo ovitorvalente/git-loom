@@ -67,6 +67,14 @@ func BuildPreview(context CommitContext) CommitPreview {
 }
 
 func BuildGroupingKey(commitType string, context CommitContext) string {
+	if topic := crossCuttingTopic(commitType, context); topic != "" {
+		return strings.Join([]string{
+			commitType,
+			"topic",
+			topic,
+		}, "|")
+	}
+
 	return strings.Join([]string{
 		commitType,
 		NormalizeScopeFromFiles(context.Files),
@@ -152,6 +160,7 @@ func detectTags(diff string, files []ChangedFile) []string {
 	for _, keyword := range []string{
 		"commit", "cli", "preview", "strict", "score", "suggest", "prompt",
 		"output", "readme", "deps", "build", "config", "git", "test", "ui",
+		"json", "help", "version", "doctor", "renderer",
 	} {
 		if strings.Contains(normalizedDiff, keyword) {
 			tagSet[keyword] = true
@@ -164,6 +173,30 @@ func detectTags(diff string, files []ChangedFile) []string {
 	}
 	sort.Strings(tags)
 	return tags
+}
+
+func crossCuttingTopic(commitType string, context CommitContext) string {
+	if !supportsCrossCuttingGrouping(commitType) {
+		return ""
+	}
+
+	topics := []string{"json", "help", "config", "version", "doctor", "renderer", "output", "commit"}
+	for _, topic := range topics {
+		if containsTag(context.Tags, topic) {
+			return topic
+		}
+	}
+
+	return ""
+}
+
+func supportsCrossCuttingGrouping(commitType string) bool {
+	switch commitType {
+	case "refactor", "chore", "docs", "test", "fix":
+		return true
+	default:
+		return false
+	}
 }
 
 func normalizePackageFamily(files []ChangedFile) string {
