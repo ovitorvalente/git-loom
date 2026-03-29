@@ -14,6 +14,7 @@ const (
 type Model struct {
 	Type        Type
 	Scope       string
+	Intent      string
 	Description string
 	Body        string
 }
