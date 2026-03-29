@@ -128,7 +128,7 @@ func TestRepositoryListFiles(t *testing.T) {
 			invocation: func(repository Repository) ([]string, error) {
 				return repository.ListChangedFiles()
 			},
-			expectedArgs: []string{"diff", "--name-only", "--diff-filter=MD"},
+			expectedArgs: nil,
 		},
 	}
 
@@ -137,11 +137,35 @@ func TestRepositoryListFiles(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
+			callIndex := 0
 			repository := Repository{
 				runCommand: func(name string, args ...string) ([]byte, error) {
 					if name != "git" {
 						t.Fatalf("expected git command, got %s", name)
 					}
+					if testCase.name == "lists changed files" {
+						expectedCommands := [][]string{
+							{"diff", "--name-only", "--diff-filter=MD"},
+							{"ls-files", "--others", "--exclude-standard"},
+						}
+						expectedArgs := expectedCommands[callIndex]
+						callIndex++
+						if len(args) != len(expectedArgs) {
+							t.Fatalf("unexpected args: %v", args)
+						}
+						for index, expectedArg := range expectedArgs {
+							if args[index] != expectedArg {
+								t.Fatalf("unexpected arg at %d: %v", index, args)
+							}
+						}
+
+						if args[0] == "diff" {
+							return []byte("a.go\n"), nil
+						}
+
+						return []byte("b.go\n"), nil
+					}
+
 					if len(args) != len(testCase.expectedArgs) {
 						t.Fatalf("unexpected args: %v", args)
 					}
