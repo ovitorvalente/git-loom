@@ -243,6 +243,10 @@ func firstCommitOptions(options []GenerateCommitOptions) GenerateCommitOptions {
 }
 
 func buildGroupKey(commitType string, scope string, semanticGroup string) string {
+	if strings.Contains(semanticGroup, "|topic|") {
+		scope = "cross-cutting"
+	}
+
 	return commitType + "|" + scope + "|" + semanticGroup
 }
 
