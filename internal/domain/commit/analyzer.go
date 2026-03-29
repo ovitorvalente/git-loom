@@ -153,15 +153,15 @@ func mostCommonScope(scopeVotes map[string]int) string {
 }
 
 func buildStructuredDescription(commitType Type, scope string, changes []Change) string {
-	target := detectTarget(scope, changes)
-	action := detectAction(commitType)
+	target := detectTarget(commitType, scope, changes)
+	action := detectAction(commitType, changes)
 
 	return strings.TrimSpace(action + " " + target)
 }
 
-func detectTarget(scope string, changes []Change) string {
+func detectTarget(commitType Type, scope string, changes []Change) string {
 	if len(changes) == 1 {
-		return normalizeFileTarget(changes[0].Path)
+		return normalizeDescriptionTarget(commitType, changes[0].Path)
 	}
 	if scope != "" {
 		return scope
@@ -170,7 +170,35 @@ func detectTarget(scope string, changes []Change) string {
 	return "repositorio"
 }
 
-func detectAction(commitType Type) string {
+func detectAction(commitType Type, changes []Change) string {
+	if hasOnlyStatus(changes, "adicionado") {
+		switch commitType {
+		case TypeFeat:
+			return "adicionar"
+		case TypeDocs:
+			return "documentar"
+		case TypeTest:
+			return "adicionar testes para"
+		default:
+			return "adicionar"
+		}
+	}
+
+	if hasOnlyStatus(changes, "atualizado") {
+		switch commitType {
+		case TypeFix:
+			return "corrigir"
+		case TypeRefactor:
+			return "refatorar"
+		case TypeDocs:
+			return "atualizar"
+		case TypeTest:
+			return "ajustar testes de"
+		default:
+			return "atualizar"
+		}
+	}
+
 	switch commitType {
 	case TypeFeat:
 		return "adicionar"
@@ -187,10 +215,96 @@ func detectAction(commitType Type) string {
 	}
 }
 
+func hasOnlyStatus(changes []Change, status string) bool {
+	if len(changes) == 0 {
+		return false
+	}
+
+	for _, change := range changes {
+		if change.Status != status {
+			return false
+		}
+	}
+
+	return true
+}
+
 func normalizeFileTarget(path string) string {
+	if target := detectTestTarget(path); target != "" {
+		return target
+	}
+
+	if target := detectSpecificTarget(path); target != "" {
+		return target
+	}
+
 	baseName := filepath.Base(path)
 	nameWithoutExtension := strings.TrimSuffix(baseName, filepath.Ext(baseName))
 	return normalizeName(nameWithoutExtension)
+}
+
+func normalizeDescriptionTarget(commitType Type, path string) string {
+	if commitType == TypeTest {
+		if target := detectTestSubject(path); target != "" {
+			return target
+		}
+	}
+
+	return normalizeFileTarget(path)
+}
+
+func detectTestTarget(path string) string {
+	subject := detectTestSubject(path)
+	if subject == "" {
+		return ""
+	}
+
+	return "testes de " + subject
+}
+
+func detectTestSubject(path string) string {
+	if !strings.HasSuffix(path, "_test.go") {
+		return ""
+	}
+
+	baseName := filepath.Base(path)
+	nameWithoutSuffix := strings.TrimSuffix(baseName, "_test.go")
+	if target := detectSpecificTarget(nameWithoutSuffix + ".go"); target != "" {
+		return target
+	}
+
+	return normalizeName(nameWithoutSuffix)
+}
+
+func detectSpecificTarget(path string) string {
+	switch {
+	case strings.Contains(path, "commit_service.go"):
+		return "commit service"
+	case strings.Contains(path, "branch_service.go"):
+		return "branch service"
+	case strings.Contains(path, "workflow_service.go"):
+		return "workflow service"
+	case strings.Contains(path, "commit.go"):
+		return "comando commit"
+	case strings.Contains(path, "branch.go"):
+		return "comando branch"
+	case strings.Contains(path, "root.go"):
+		return "comando raiz"
+	case strings.Contains(path, "loader.go"):
+		return "loader de configuracao"
+	case strings.Contains(path, "schema.go"):
+		return "schema de configuracao"
+	case strings.Contains(path, "repository.go"):
+		return "repositorio"
+	case strings.Contains(path, "prompts.go"):
+		return "prompts"
+	case strings.Contains(path, "output.go"):
+		return "output"
+	case strings.Contains(path, "_test.go"):
+		return "testes"
+	default:
+		return ""
+	}
 }
 
 func normalizeName(name string) string {
@@ -206,9 +320,42 @@ func buildStructuredBody(changes []Change) string {
 
 	details := make([]string, 0, len(changes))
 	for _, change := range changes {
-		target := normalizeFileTarget(change.Path)
-		details = append(details, "- "+change.Status+" "+target)
+		details = append(details, "- "+describeChange(change))
 	}
 
 	return strings.Join(details, "\n")
+}
+
+func describeChange(change Change) string {
+	target := normalizeFileTarget(change.Path)
+	context := normalizeChangeContext(change.Path)
+
+	switch change.Status {
+	case "adicionado":
+		return "adiciona " + target + context
+	case "removido":
+		return "remove " + target + context
+	default:
+		return "atualiza " + target + context
+	}
+}
+
+func normalizeChangeContext(path string) string {
+	directory := filepath.Dir(path)
+	if directory == "." || directory == "" {
+		return ""
+	}
+
+	segments := strings.Split(directory, "/")
+	if len(segments) > 0 {
+		switch segments[0] {
+		case "internal", "cmd", "pkg":
+			segments = segments[1:]
+		}
+	}
+	if len(segments) > 2 {
+		segments = segments[len(segments)-2:]
+	}
+
+	return " em " + strings.Join(segments, "/")
 }
