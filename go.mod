@@ -1,6 +1,6 @@
 module github.com/ovitorvalente/git-loom
 
-go 1.26.1
+go 1.21
 
 require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
