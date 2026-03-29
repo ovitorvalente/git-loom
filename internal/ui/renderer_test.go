@@ -128,7 +128,7 @@ func TestRendererChangedFiles(t *testing.T) {
 	if !strings.Contains(output, "staged:") {
 		t.Fatalf("unexpected output: %q", output)
 	}
-	if !strings.Contains(output, "changes:") {
+	if !strings.Contains(output, "changes (2):") {
 		t.Fatalf("unexpected output: %q", output)
 	}
 	if !strings.Contains(output, "internal/app/commit_service.go") {
@@ -166,6 +166,7 @@ func TestRendererCommitSummary(t *testing.T) {
 		"✔ 1 commit criado",
 		"qualidade media: 85",
 		"status: working tree limpa",
+		"☕ ate a proxima",
 	}
 
 	for _, expectedPart := range expectedParts {
