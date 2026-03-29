@@ -10,7 +10,7 @@ import (
 )
 
 func ConfirmCommit(input io.Reader, output io.Writer, question string) (bool, error) {
-	promptPrefix := colorizeText(statusPromptColor, "?")
+	promptPrefix := colorizeText(statusPromptColor, ">")
 	highlightedQuestion := colorizeText(defaultColor, question)
 	suffix := colorizeText(emphasisColor, shared.MessageCommitPromptSuffix)
 	if _, err := fmt.Fprintf(output, "\n%s %s %s", promptPrefix, highlightedQuestion, suffix); err != nil {
