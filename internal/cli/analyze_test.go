@@ -32,7 +32,7 @@ func TestAnalyzeCommandTextOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
-	if !strings.Contains(output.String(), "◆ feat(cli)") {
+	if !strings.Contains(output.String(), "Analisando 1 arquivo modificado...") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
 	if strings.Contains(output.String(), "commit criado:") {

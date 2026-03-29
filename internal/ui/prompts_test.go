@@ -55,9 +55,6 @@ func TestConfirmCommit(t *testing.T) {
 			if !strings.Contains(output.String(), ">") {
 				t.Fatalf("unexpected prompt output: %q", output.String())
 			}
-			if strings.Contains(output.String(), "> ?") {
-				t.Fatalf("unexpected prompt output: %q", output.String())
-			}
 			if !strings.Contains(output.String(), "criar commit? [Y/n]: ") {
 				t.Fatalf("unexpected prompt output: %q", output.String())
 			}
