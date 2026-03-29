@@ -11,7 +11,8 @@ import (
 
 func ConfirmCommit(input io.Reader, output io.Writer, question string) (bool, error) {
 	highlightedQuestion := colorizeLine(headerColor, question)
-	if _, err := fmt.Fprintf(output, "\n%s %s %s", colorizeLine(accentColor, "?"), highlightedQuestion, shared.MessageCommitPromptSuffix); err != nil {
+	promptPrefix := colorizeLine(borderColor, ">")
+	if _, err := fmt.Fprintf(output, "\n%s %s %s", promptPrefix, highlightedQuestion, shared.MessageCommitPromptSuffix); err != nil {
 		return false, err
 	}
 
