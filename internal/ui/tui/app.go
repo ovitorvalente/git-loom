@@ -17,7 +17,6 @@ type viewState int
 const (
 	viewAnalyze viewState = iota
 	viewReview
-	viewSummary
 )
 
 type CommitToggle struct {
@@ -116,11 +115,8 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch m.state {
-	case viewReview:
+	if m.state == viewReview {
 		return m.handleReviewKey(msg)
-	case viewSummary:
-		return m.handleSummaryKey(msg)
 	}
 	return m, nil
 }
@@ -132,8 +128,7 @@ func (m appModel) handleReviewKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case "enter":
 		m.confirmed = true
-		m.state = viewSummary
-		return m, nil
+		return m, tea.Quit
 	case "up", "k":
 		if m.cursor > 0 {
 			m.cursor--
@@ -158,14 +153,6 @@ func (m appModel) handleReviewKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m appModel) handleSummaryKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
-	case "ctrl+c", "esc", "q", "enter":
-		return m, tea.Quit
-	}
-	return m, nil
-}
-
 func (m appModel) View() string {
 	if !m.ready {
 		return ""
@@ -176,8 +163,6 @@ func (m appModel) View() string {
 		return m.viewAnalyze()
 	case viewReview:
 		return m.viewReview()
-	case viewSummary:
-		return m.viewSummary()
 	}
 	return ""
 }
@@ -332,80 +317,6 @@ func (m appModel) renderFooter(width int) string {
 	}
 
 	return "  " + strings.Join(parts, StyleMuted.Render(" · "))
-}
-
-func (m appModel) viewSummary() string {
-	var b strings.Builder
-	width := m.width
-	if width == 0 {
-		width = 80
-	}
-	if width > 100 {
-		width = 100
-	}
-
-	selected := 0
-	for _, c := range m.commits {
-		if c.Selected {
-			selected++
-		}
-	}
-
-	b.WriteString("\n")
-	b.WriteString("  ")
-	b.WriteString(Logo())
-	b.WriteString(" ")
-	b.WriteString(StyleMuted.Render("resumo"))
-	b.WriteString("\n")
-	b.WriteString("  ")
-	b.WriteString(Divider(width - 4))
-	b.WriteString("\n\n")
-
-	if selected == 0 {
-		b.WriteString("  ")
-		b.WriteString(StyleWarning.Render("nenhum commit selecionado"))
-		b.WriteString("\n\n")
-	} else {
-		commitLabel := "commit"
-		if selected > 1 {
-			commitLabel = "commits"
-		}
-		b.WriteString("  ")
-		b.WriteString(StyleSuccess.Render(fmt.Sprintf("☕ %d %s sera criado", selected, commitLabel)))
-		b.WriteString("\n\n")
-
-		for _, commit := range m.commits {
-			if !commit.Selected {
-				continue
-			}
-			plan := commit.Plan
-			commitType := string(plan.Result.Commit.Type)
-			scope := plan.Result.Commit.Scope
-			desc := plan.Result.Commit.Description
-
-			typeStr := StyleForType(commitType).Render(commitType)
-			scopeStr := ""
-			if scope != "" {
-				scopeStr = "(" + StyleScope.Render(scope) + ")"
-			}
-
-			b.WriteString("  ")
-			b.WriteString(fmt.Sprintf("%s%s", typeStr, scopeStr))
-			b.WriteString("\n")
-			b.WriteString("  ")
-			b.WriteString(StyleMuted.Render("→ " + desc))
-			b.WriteString("\n\n")
-		}
-	}
-
-	b.WriteString("  ")
-	b.WriteString(Divider(width - 4))
-	b.WriteString("\n")
-	b.WriteString("  ")
-	b.WriteString(StyleFooterKey.Render("enter") + StyleFooter.Render(" para fechar"))
-	b.WriteString("\n")
-
-	return b.String()
 }
 
 func (m appModel) result() AppResult {
