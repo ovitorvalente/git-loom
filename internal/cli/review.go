@@ -82,6 +82,10 @@ func executeReview(command *cobra.Command, dependencies commitDependencies, opti
 		ShowPreview: options.preview,
 	})
 
+	if !options.json {
+		ui.PrintStatus(command.OutOrStdout(), "analisando mudancas...")
+	}
+
 	selectedPaths, err := prepareCommitPaths(command, dependencies, commitOptions{
 		yes: false,
 		review: reviewOptions{
@@ -139,6 +143,13 @@ func printReview(command *cobra.Command, execution reviewExecution, options revi
 
 	if len(execution.review.Suggestions) > 0 {
 		printSuggestions(command, execution.renderer, execution.review.Suggestions)
+	}
+
+	if len(execution.review.Plans) > 1 {
+		preview := execution.renderer.FinalPreview(execution.review.Plans)
+		if preview != "" {
+			fmt.Fprintf(command.OutOrStdout(), "\n%s\n", preview)
+		}
 	}
 
 	return nil

@@ -169,6 +169,10 @@ func createPlannedCommits(command *cobra.Command, gitRepository interfaces.GitRe
 	skipped := []jsonSkippedCommit{}
 	plans := review.Plans
 
+	if !asJSON && len(plans) > 1 {
+		ui.PrintStatus(command.OutOrStdout(), fmt.Sprintf("criando %d commits...", len(plans)))
+	}
+
 	for index, plan := range plans {
 		confirmed, err := confirmPlannedCommit(command, index+1, len(plans), autoApprove)
 		if err != nil {
