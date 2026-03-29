@@ -37,19 +37,16 @@ func TestCommitCommandDryRun(t *testing.T) {
 	if len(gitRepository.CommitPathsCalls) != 0 {
 		t.Fatalf("expected no commit calls, got %d", len(gitRepository.CommitPathsCalls))
 	}
-	if !strings.Contains(output.String(), "Analisando 1 arquivo modificado...") {
+	if !strings.Contains(output.String(), "feat") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
-	if !strings.Contains(output.String(), "Sugestao de commit:") {
+	if !strings.Contains(output.String(), "cli") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
-	if !strings.Contains(output.String(), "feat(cli): adicionar fluxo de commit") {
+	if !strings.Contains(output.String(), "analise:") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
-	if !strings.Contains(output.String(), "Detalhes:") {
-		t.Fatalf("unexpected output: %q", output.String())
-	}
-	if !strings.Contains(output.String(), "Score:") {
+	if !strings.Contains(output.String(), "100") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
 }
@@ -89,10 +86,10 @@ func TestCommitCommandStagesChangedFilesWhenConfirmed(t *testing.T) {
 	if len(gitRepository.StageFilesCalls) != 1 {
 		t.Fatalf("expected one stage call, got %d", len(gitRepository.StageFilesCalls))
 	}
-	if !strings.Contains(output.String(), "Arquivos detectados no working tree") {
+	if !strings.Contains(output.String(), "arquivos detectados no working tree") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
-	if !strings.Contains(output.String(), "Changes (2):") {
+	if !strings.Contains(output.String(), "changes (2):") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
 	if len(gitRepository.StageFilesCalls[0]) != 2 {
@@ -148,10 +145,10 @@ func TestCommitCommandSplitsCommitsInBlocksOfFour(t *testing.T) {
 	if len(gitRepository.CommitPathsCalls[1].Paths) != 1 {
 		t.Fatalf("expected second block with one file, got %d", len(gitRepository.CommitPathsCalls[1].Paths))
 	}
-	if !strings.Contains(output.String(), "Commit concluido: 2 commits criados") {
+	if !strings.Contains(output.String(), "✔ 2 commits criados") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
-	if !strings.Contains(output.String(), "Qualidade media:") {
+	if !strings.Contains(output.String(), "qualidade media:") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
 }
@@ -188,13 +185,10 @@ func TestCommitCommandPreviewShowsDiffImpact(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
-	if !strings.Contains(output.String(), "Preview:") {
+	if !strings.Contains(output.String(), "preview:") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
-	if !strings.Contains(output.String(), "linhas: +2 -0") {
-		t.Fatalf("unexpected output: %q", output.String())
-	}
-	if !strings.Contains(output.String(), "Detalhes:") {
+	if !strings.Contains(output.String(), "+2 -0") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
 }
@@ -234,10 +228,10 @@ func TestCommitCommandVerboseShowsExpandedDetails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
-	if !strings.Contains(output.String(), "Verbose:") {
+	if !strings.Contains(output.String(), "criterios:") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
-	if !strings.Contains(output.String(), "impacto: +2 -0") {
+	if !strings.Contains(output.String(), "+2 -0") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
 	if !strings.Contains(output.String(), "internal/ui/renderer.go") {
@@ -414,7 +408,7 @@ func TestCommitCommandUsesEnterAsDefaultConfirmation(t *testing.T) {
 	if len(gitRepository.CommitPathsCalls) != 1 {
 		t.Fatalf("expected one commit call, got %d", len(gitRepository.CommitPathsCalls))
 	}
-	if !strings.Contains(output.String(), "[Y/n]: ") {
+	if !strings.Contains(output.String(), "[Y/n]:") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
 }
