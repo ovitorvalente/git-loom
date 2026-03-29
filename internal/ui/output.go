@@ -58,6 +58,16 @@ func FormatChangedFiles(paths []string) string {
 	return strings.Join(lines, "\n")
 }
 
+func FormatCommitConclusion() string {
+	lines := []string{
+		colorizeLine(borderColor, horizontalRule()),
+		colorizeLine(successColor, "✔ "+shared.MessageCommitFinished),
+		colorizeLine(accentColor, "☕ "+shared.MessageCommitFarewell),
+	}
+
+	return strings.Join(lines, "\n")
+}
+
 func formatValue(value string) string {
 	trimmedValue := strings.TrimSpace(value)
 	if trimmedValue == "" {
