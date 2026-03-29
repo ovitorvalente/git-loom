@@ -92,7 +92,7 @@ func TestCommitCommandStagesChangedFilesWhenConfirmed(t *testing.T) {
 	if !strings.Contains(output.String(), "arquivos alterados") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
-	if !strings.Contains(output.String(), "changes:") {
+	if !strings.Contains(output.String(), "changes (2):") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
 	if len(gitRepository.StageFilesCalls[0]) != 2 {
@@ -299,6 +299,39 @@ func TestCommitCommandCancelsWithoutConfirmation(t *testing.T) {
 		t.Fatalf("expected no commit calls, got %d", len(gitRepository.CommitPathsCalls))
 	}
 	if !strings.Contains(output.String(), "commit cancelado") {
+		t.Fatalf("unexpected output: %q", output.String())
+	}
+}
+
+func TestCommitCommandUsesEnterAsDefaultConfirmation(t *testing.T) {
+	t.Parallel()
+
+	output := &bytes.Buffer{}
+	gitRepository := &mocks.GitRepository{
+		ListStagedFilesFunc: func() ([]string, error) {
+			return []string{"internal/cli/commit.go"}, nil
+		},
+		GetDiffFunc: func(paths ...string) (string, error) {
+			return "diff --git a/internal/cli/commit.go b/internal/cli/commit.go\nindex 1111111..2222222 100644\n", nil
+		},
+	}
+	command := newCommitCommandWithDependencies(commitDependencies{
+		gitRepository: gitRepository,
+		aiProvider:    &mocks.AIProvider{},
+	})
+
+	command.SetOut(output)
+	command.SetErr(output)
+	command.SetIn(strings.NewReader("\n"))
+
+	err := command.Execute()
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if len(gitRepository.CommitPathsCalls) != 1 {
+		t.Fatalf("expected one commit call, got %d", len(gitRepository.CommitPathsCalls))
+	}
+	if !strings.Contains(output.String(), "[Y/n]: ") {
 		t.Fatalf("unexpected output: %q", output.String())
 	}
 }
