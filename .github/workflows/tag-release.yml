@@ -1,0 +1,40 @@
+name: tag-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versao no formato vX.Y.Z"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  create-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version
+        run: |
+          version="${{ github.event.inputs.version }}"
+          case "$version" in
+            v*) ;;
+            *) echo "version precisa comecar com v"; exit 1 ;;
+          esac
+
+      - name: Ensure tag does not exist
+        run: |
+          git rev-parse "${{ github.event.inputs.version }}" >/dev/null 2>&1 && exit 1 || exit 0
+
+      - name: Create and push tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "${{ github.event.inputs.version }}"
+          git push origin "${{ github.event.inputs.version }}"
