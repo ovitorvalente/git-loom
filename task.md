@@ -1,16 +1,15 @@
-Você é um engenheiro de software senior especializado em Go, UX de CLI e arquitetura limpa.
+Você é um engenheiro de software senior especializado em Go, design de CLI (DX/UX) e arquitetura limpa.
 
 # CONTEXTO
 
-Estou desenvolvendo um CLI chamado "gitloom", responsável por automatizar commits Git com inteligência semântica.
+Estou desenvolvendo um CLI chamado "gitloom", focado em automação inteligente de commits Git.
 
-Atualmente o CLI funciona, mas a interface está com problemas:
+O CLI já funciona, mas o output atual é técnico demais e pouco eficiente em UX:
 
-- Verbosa e redundante
-- Baixa hierarquia visual
-- Mensagens pouco úteis (ex: "atualizar")
+- Mensagens redundantes
+- Baixa clareza visual
 - Feedback pouco acionável
-- Experiência mais próxima de logs do que de um assistente
+- Falta de assistividade (parece um logger, não um assistente)
 
 Exemplo atual:
 
@@ -23,38 +22,29 @@ Exemplo atual:
 
 # OBJETIVO
 
-Refatorar COMPLETAMENTE a camada de output/UX do CLI para torná-lo:
+Transformar o CLI em uma experiência PREMIUM, com:
 
-- Limpo
-- Escaneável
-- Profissional
-- Orientado a decisão
-- Sem redundância
-- Com feedback acionável
+- Output limpo, escaneável e profissional
+- Feedback inteligente e acionável
+- Redução de ruído
+- Sensação de “assistente inteligente”
 
-# REQUISITOS
+---
 
-## 1. NOVO DESIGN DE OUTPUT
+# TAREFAS
 
-Criar um novo formato de exibição com:
+## 1. REFATORAR OUTPUT (PRINCIPAL)
 
-- Hierarquia visual clara
-- Separação por blocos
-- Uso mínimo de texto
-- Destaque para informações importantes
+Criar um novo formato padrão:
 
-Exemplo esperado:
+◆ docs(config) [82] 🟢
 
-◆ docs(gitignore) [85]
-
-mensagem:
 atualizar regras do .gitignore
 
-arquivos:
 +4 -1 .gitignore
 
 análise:
-⚠ escopo genérico
+⚠ escopo genérico: "gitignore"
 sugestões:
 → config
 → repo
@@ -63,19 +53,87 @@ sugestões:
 
 ## 2. REMOVER REDUNDÂNCIA
 
-Eliminar:
+Eliminar completamente:
 
-- descricao duplicada
-- detalhes genéricos
-- mensagens repetidas
+- "descricao"
+- "detalhes" genéricos
+- duplicação entre mensagem e descrição
+
+Manter apenas informação útil.
 
 ---
 
-## 3. SISTEMA DE RENDERIZAÇÃO
+## 3. IMPLEMENTAR SISTEMA DE SUGESTÕES
 
-Criar uma camada de UI desacoplada:
+Criar um módulo:
 
-internal/ui/
+internal/semantic/suggestions.go
+
+Responsável por:
+
+- detectar mensagens genéricas ("atualizar", "ajustes")
+- detectar escopos fracos ("file", "gitignore")
+- sugerir melhorias
+
+Exemplo:
+
+ANTES:
+escopo: gitignore
+
+DEPOIS:
+⚠ escopo genérico
+→ sugestões: config, repo, tooling
+
+---
+
+## 4. MELHORAR SCORE DE QUALIDADE
+
+Transformar score em algo mais rico:
+
+qualidade: 82 🟢 bom
+
+critérios:
+✔ tamanho adequado
+✔ tipo correto
+⚠ descrição genérica
+
+---
+
+## 5. IMPLEMENTAR PREVIEW FINAL
+
+Antes de criar commits:
+
+Resumo:
+
+1 commit será criado
+
+docs(config)
+→ atualizar regras do .gitignore
+
+---
+
+## 6. ADICIONAR MODO CLEAN E VERBOSE
+
+- default: clean (mínimo necessário)
+- flag: --verbose (mostra análise completa)
+
+---
+
+## 7. ADICIONAR MICROINTERAÇÕES
+
+Durante execução:
+
+- "analisando mudanças..."
+- "gerando commits..."
+- "validando qualidade..."
+
+---
+
+## 8. IMPLEMENTAR RENDERER DESACOPLADO
+
+Criar:
+
+internal/ui/renderer/
 renderer.go
 commit_view.go
 summary_view.go
@@ -87,72 +145,91 @@ Separar:
 
 ---
 
-## 4. MODOS DE EXECUÇÃO
+## 9. IMPLEMENTAR COMMIT PREVIEW INTELIGENTE
 
-Implementar:
+Mostrar resumo do diff:
 
-- modo padrão (clean)
-- modo verbose (--verbose)
+preview:
 
----
+- adiciona regra para ignorar arquivos temporários
 
-## 5. SCORE VISUAL
-
-Transformar:
-
-(qualidade: 85/100)
-
-Em algo visual:
-
-[85] 🟢 bom
+* remove regra duplicada
 
 ---
 
-## 6. FEEDBACK INTELIGENTE
+## 10. CRIAR ALIAS CURTO PARA O CLI
 
-Transformar mensagens genéricas em sugestões acionáveis:
+Objetivo: tornar o comando mais rápido de usar.
+
+Sugestões de alias:
+
+- gl
+- gm (git message)
+- gcx (git commit extended)
+- loom
+
+Escolher o melhor com base em:
+
+- memorabilidade
+- ausência de conflito com git
+
+---
+
+## IMPLEMENTAÇÃO DO ALIAS
+
+### 1. Nome alternativo do binário
+
+Permitir execução:
+
+gitloom
+gl
+
+### 2. Suporte no Cobra
+
+Ajustar comando root para aceitar alias:
+
+Use: "gitloom"
+Aliases: ["gl", "loom"]
+
+---
+
+## 11. MELHORAR OUTPUT FINAL
 
 ANTES:
-"escopo não identificado"
+✔ fluxo finalizado
 
 DEPOIS:
-"escopo genérico: gitignore"
-"sugestões: config, repo, tooling"
 
----
+✔ 1 commit criado com sucesso
 
-## 7. RESUMO FINAL
-
-Adicionar output final mais forte:
-
-✔ 1 commit criado
-qualidade média: 85
+qualidade média: 82
 status: working tree limpa
 
 ---
 
-## 8. BOAS PRÁTICAS
+# REQUISITOS TÉCNICOS
 
-- Seguir Clean Architecture
-- Código idiomático Go
-- Separação clara de responsabilidades
-- Sem lógica de negócio na camada de UI
+- Go idiomático
+- Clean Architecture
+- Separação de responsabilidades
 - Código testável
+- Sem lógica de negócio na UI
 
 ---
 
 # OUTPUT ESPERADO
 
-1. Nova estrutura de arquivos
-2. Implementação completa do renderer
-3. Refatoração do fluxo atual para usar o novo renderer
-4. Sugestões adicionais de melhoria
+1. Refatoração completa da camada de UI
+2. Implementação do sistema de sugestões
+3. Novo renderer desacoplado
+4. Implementação de alias no CLI
+5. Código pronto para produção
 
 ---
 
 # IMPORTANTE
 
-- NÃO gerar código genérico
-- NÃO repetir estrutura atual
-- PENSAR como produto real (nível open source premium)
-- Código deve ser pronto para produção
+- Não gerar código genérico
+- Pensar como produto real open source
+- Priorizar experiência do desenvolvedor (DX)
+- Criar algo que pareça uma ferramenta premium

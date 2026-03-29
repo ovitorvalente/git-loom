@@ -41,20 +41,14 @@ func TestRendererCommitPlanCleanMode(t *testing.T) {
 	output := renderer.CommitPlan(1, 1, plan)
 
 	expectedParts := []string{
-		"Analisando 1 arquivo modificado...",
-		"Sugestao de commit:",
-		"docs(gitignore): atualizar regras do .gitignore",
-		"Score: 85/100",
-		"Tipo: docs",
-		"Escopo: gitignore",
-		"Detalhes:",
-		"remove entradas antigas",
-		"│ ~ .gitignore",
-		"Analise:",
+		"docs",
+		"gitignore",
+		"85",
+		"analise:",
 		"escopo generico: gitignore",
-		"Sugestoes:",
-		"• config",
-		"• repo",
+		"sugestoes:",
+		"→ config",
+		"→ repo",
 	}
 
 	for _, expectedPart := range expectedParts {
@@ -86,7 +80,13 @@ func TestRendererCommitPlanVerboseMode(t *testing.T) {
 			Additions:    12,
 			Deletions:    3,
 		},
-		Quality: semantic.CommitQuality{Score: 92},
+		Quality: semantic.CommitQuality{
+			Score: 92,
+			Criteria: []semantic.QualityCriteria{
+				{Name: "tamanho", Passed: true},
+				{Name: "escopo", Passed: false, Warning: true, Message: "escopo generico: cli"},
+			},
+		},
 		Context: semantic.CommitContext{
 			Files: []semantic.ChangedFile{
 				{Path: "internal/cli/commit.go", Status: "atualizado"},
@@ -98,14 +98,14 @@ func TestRendererCommitPlanVerboseMode(t *testing.T) {
 	output := renderer.CommitPlan(1, 2, plan)
 
 	expectedParts := []string{
-		"Analisando 2 arquivos modificados... [1/2]",
-		"Detalhes:",
-		"│ ~ internal/cli/commit.go",
-		"│ + internal/ui/renderer.go",
-		"Verbose:",
-		"mensagem final: feat(cli): adicionar fluxo de commit",
-		"impacto: +12 -3",
-		"detalhe: adiciona renderer novo",
+		"commit 1/2",
+		"internal/cli/commit.go",
+		"internal/ui/renderer.go",
+		"+12 -3",
+		"adiciona renderer novo",
+		"analise:",
+		"sugestoes:",
+		"criterios:",
 	}
 
 	for _, expectedPart := range expectedParts {
@@ -124,13 +124,13 @@ func TestRendererChangedFiles(t *testing.T) {
 		[]string{"internal/app/commit_service.go", "internal/ui/renderer.go"},
 	)
 
-	if !strings.Contains(output, "Arquivos detectados no working tree") {
+	if !strings.Contains(output, "arquivos detectados no working tree") {
 		t.Fatalf("unexpected output: %q", output)
 	}
-	if !strings.Contains(output, "Staged:") {
+	if !strings.Contains(output, "staged:") {
 		t.Fatalf("unexpected output: %q", output)
 	}
-	if !strings.Contains(output, "Changes (2):") {
+	if !strings.Contains(output, "changes (2):") {
 		t.Fatalf("unexpected output: %q", output)
 	}
 	if !strings.Contains(output, "internal/app/commit_service.go") {
@@ -146,7 +146,7 @@ func TestRendererSuggestions(t *testing.T) {
 		{Message: "agrupar arquivos de config em um unico bloco"},
 	})
 
-	if !strings.Contains(output, "Sugestoes encontradas") {
+	if !strings.Contains(output, "sugestoes encontradas") {
 		t.Fatalf("unexpected output: %q", output)
 	}
 	if !strings.Contains(output, "agrupar arquivos de config em um unico bloco") {
@@ -165,15 +165,54 @@ func TestRendererCommitSummary(t *testing.T) {
 	})
 
 	expectedParts := []string{
-		"Commit concluido: 1 commit criado",
-		"Qualidade media: 85",
-		"Status: working tree limpa",
-		"ate a proxima",
+		"✔ 1 commit criado",
+		"qualidade media:",
+		"85",
+		"bom",
+		"status: working tree limpa",
 	}
 
 	for _, expectedPart := range expectedParts {
 		if !strings.Contains(output, expectedPart) {
 			t.Fatalf("expected output to contain %q, got %q", expectedPart, output)
 		}
+	}
+}
+
+func TestRendererFinalPreview(t *testing.T) {
+	t.Parallel()
+
+	renderer := NewRenderer(RenderOptions{})
+	plans := []app.CommitPlan{
+		{
+			Result: app.CommitResult{
+				Message: "docs(config): atualizar regras",
+				Commit: domaincommit.Model{
+					Type:  domaincommit.TypeDocs,
+					Scope: "config",
+				},
+			},
+		},
+		{
+			Result: app.CommitResult{
+				Message: "feat(cli): adicionar comando",
+				Commit: domaincommit.Model{
+					Type:  domaincommit.TypeFeat,
+					Scope: "cli",
+				},
+			},
+		},
+	}
+
+	output := renderer.FinalPreview(plans)
+
+	if !strings.Contains(output, "2 commits") {
+		t.Fatalf("expected output to mention 2 commits, got %q", output)
+	}
+	if !strings.Contains(output, "docs(config)") {
+		t.Fatalf("expected output to contain docs(config), got %q", output)
+	}
+	if !strings.Contains(output, "feat(cli)") {
+		t.Fatalf("expected output to contain feat(cli), got %q", output)
 	}
 }
