@@ -12,7 +12,6 @@ const (
 	MessageCommitCreated        = "commit criado: %s"
 	MessageCommitCanceled       = "commit cancelado"
 	MessageCommitFinished       = "fluxo finalizado com sucesso"
-	MessageCommitFarewell       = "obrigado por usar o gitloom"
 	MessageCommitPlanQuestion   = "criar commits planejados?"
 	MessageApplySuggestions     = "aplicar sugestoes automaticamente?"
 	MessageCreateBlockQuestion  = "criar bloco %d/%d?"
@@ -22,7 +21,7 @@ const (
 	MessageEmptyDiff            = "nenhuma mudanca staged encontrada; execute git add antes de gitloom commit"
 	MessagePartialStage         = "arquivos parcialmente staged ainda nao sao suportados neste fluxo automatico; finalize ou descarte as mudancas unstaged antes de continuar"
 	MessageStrictModeFailed     = "modo estrito falhou: existem commits com qualidade abaixo do minimo aceitavel"
-	MessageCommitPromptSuffix   = "[y/N]: "
+	MessageCommitPromptSuffix   = "[Y/n]: "
 	MessageFilesLabel           = "arquivos"
 	MessageDetailsLabel         = "detalhes"
 	MessageTypeLabel            = "tipo"
@@ -35,4 +34,5 @@ const (
 	MessageSuggestionsLabel     = "sugestoes"
 	MessageImpactLabel          = "impacto"
 	MessageCommitLabel          = "commit %d/%d"
+	MessageCommitFarewell       = "ate a proxima"
 )
