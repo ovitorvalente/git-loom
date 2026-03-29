@@ -1,0 +1,12 @@
+{
+  "go.toolsEnvVars": {
+    "GOMODCACHE": "/home/ovitorvalente/Developer/projetos/git-loom/.cache/go-mod",
+    "GOCACHE": "/home/ovitorvalente/Developer/projetos/git-loom/.cache/go-build"
+  },
+  "gopls": {
+    "env": {
+      "GOMODCACHE": "/home/ovitorvalente/Developer/projetos/git-loom/.cache/go-mod",
+      "GOCACHE": "/home/ovitorvalente/Developer/projetos/git-loom/.cache/go-build"
+    }
+  }
+}
