@@ -2,6 +2,7 @@ package mocks
 
 type GitRepository struct {
 	GetDiffFunc          func(paths ...string) (string, error)
+	IsRepositoryFunc     func() (bool, error)
 	ListStagedFilesFunc  func() ([]string, error)
 	ListChangedFilesFunc func() ([]string, error)
 	StageFilesFunc       func(paths []string) error
@@ -28,6 +29,14 @@ func (mock *GitRepository) GetDiff(paths ...string) (string, error) {
 	}
 
 	return mock.GetDiffFunc(paths...)
+}
+
+func (mock *GitRepository) IsRepository() (bool, error) {
+	if mock.IsRepositoryFunc == nil {
+		return true, nil
+	}
+
+	return mock.IsRepositoryFunc()
 }
 
 func (mock *GitRepository) ListStagedFiles() ([]string, error) {
