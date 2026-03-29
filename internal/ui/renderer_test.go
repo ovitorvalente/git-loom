@@ -41,18 +41,20 @@ func TestRendererCommitPlanCleanMode(t *testing.T) {
 	output := renderer.CommitPlan(1, 1, plan)
 
 	expectedParts := []string{
-		"◆ docs(gitignore) [85] bom",
-		"mensagem:",
+		"Analisando 1 arquivo modificado...",
+		"Sugestao de commit:",
 		"docs(gitignore): atualizar regras do .gitignore",
-		"detalhes:",
+		"Score: 85/100",
+		"Tipo: docs",
+		"Escopo: gitignore",
+		"Detalhes:",
 		"remove entradas antigas",
-		"arquivos:",
-		"+4 -1 .gitignore",
-		"analise:",
+		"│ ~ .gitignore",
+		"Analise:",
 		"escopo generico: gitignore",
-		"sugestoes:",
-		"→ config",
-		"→ repo",
+		"Sugestoes:",
+		"• config",
+		"• repo",
 	}
 
 	for _, expectedPart := range expectedParts {
@@ -96,11 +98,11 @@ func TestRendererCommitPlanVerboseMode(t *testing.T) {
 	output := renderer.CommitPlan(1, 2, plan)
 
 	expectedParts := []string{
-		"◆ feat(cli) 1/2 [92] excelente",
-		"detalhes:",
-		"+12 -3 internal/cli/commit.go",
-		"+12 -3 internal/ui/renderer.go",
-		"verbose:",
+		"Analisando 2 arquivos modificados... [1/2]",
+		"Detalhes:",
+		"│ ~ internal/cli/commit.go",
+		"│ + internal/ui/renderer.go",
+		"Verbose:",
 		"mensagem final: feat(cli): adicionar fluxo de commit",
 		"impacto: +12 -3",
 		"detalhe: adiciona renderer novo",
@@ -122,13 +124,13 @@ func TestRendererChangedFiles(t *testing.T) {
 		[]string{"internal/app/commit_service.go", "internal/ui/renderer.go"},
 	)
 
-	if !strings.Contains(output, "arquivos alterados") {
+	if !strings.Contains(output, "Arquivos detectados no working tree") {
 		t.Fatalf("unexpected output: %q", output)
 	}
-	if !strings.Contains(output, "staged:") {
+	if !strings.Contains(output, "Staged:") {
 		t.Fatalf("unexpected output: %q", output)
 	}
-	if !strings.Contains(output, "changes (2):") {
+	if !strings.Contains(output, "Changes (2):") {
 		t.Fatalf("unexpected output: %q", output)
 	}
 	if !strings.Contains(output, "internal/app/commit_service.go") {
@@ -144,7 +146,7 @@ func TestRendererSuggestions(t *testing.T) {
 		{Message: "agrupar arquivos de config em um unico bloco"},
 	})
 
-	if !strings.Contains(output, "◆ sugestoes") {
+	if !strings.Contains(output, "Sugestoes encontradas") {
 		t.Fatalf("unexpected output: %q", output)
 	}
 	if !strings.Contains(output, "agrupar arquivos de config em um unico bloco") {
@@ -163,10 +165,10 @@ func TestRendererCommitSummary(t *testing.T) {
 	})
 
 	expectedParts := []string{
-		"✔ 1 commit criado",
-		"qualidade media: 85",
-		"status: working tree limpa",
-		"☕ ate a proxima",
+		"Commit concluido: 1 commit criado",
+		"Qualidade media: 85",
+		"Status: working tree limpa",
+		"ate a proxima",
 	}
 
 	for _, expectedPart := range expectedParts {
