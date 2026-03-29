@@ -34,7 +34,7 @@ func TestCommitServiceGenerateCommit(t *testing.T) {
 				},
 			},
 			expectedType:      domaincommit.TypeFeat,
-			expectedMessage:   "feat(cli): adicionar comando commit\n\n- adiciona comando commit em cli",
+			expectedMessage:   "feat(cli): adicionar fluxo de commit\n\n- adiciona comando commit em cli",
 			expectedDiff:      "diff --git a/internal/cli/commit.go b/internal/cli/commit.go\nnew file mode 100644\n",
 			expectedAIInvokes: 0,
 		},
@@ -49,7 +49,7 @@ func TestCommitServiceGenerateCommit(t *testing.T) {
 				Scope: "core",
 			},
 			expectedType:      domaincommit.TypeRefactor,
-			expectedMessage:   "refactor(core): refatorar commit service\n\n- atualiza commit service em app",
+			expectedMessage:   "refactor(core): refinar planejamento de commits\n\n- atualiza commit service em app",
 			expectedDiff:      "diff --git a/internal/app/commit_service.go b/internal/app/commit_service.go\nindex 1111111..2222222 100644\n",
 			expectedAIInvokes: 0,
 		},
@@ -154,7 +154,7 @@ func TestCommitServicePlanCommits(t *testing.T) {
 		},
 	}, &mocks.AIProvider{})
 
-	plans, err := service.PlanCommits([]string{
+	review, err := service.PlanCommits([]string{
 		"internal/cli/a.go",
 		"internal/cli/b.go",
 		"internal/cli/c.go",
@@ -164,13 +164,16 @@ func TestCommitServicePlanCommits(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
-	if len(plans) != 2 {
-		t.Fatalf("expected two plans, got %d", len(plans))
+	if len(review.Plans) != 2 {
+		t.Fatalf("expected two plans, got %d", len(review.Plans))
 	}
-	if len(plans[0].Result.Paths) != 4 {
-		t.Fatalf("expected first plan with four files, got %d", len(plans[0].Result.Paths))
+	if len(review.Plans[0].Result.Paths) != 4 {
+		t.Fatalf("expected first plan with four files, got %d", len(review.Plans[0].Result.Paths))
 	}
-	if len(plans[1].Result.Paths) != 1 {
-		t.Fatalf("expected second plan with one file, got %d", len(plans[1].Result.Paths))
+	if len(review.Plans[1].Result.Paths) != 1 {
+		t.Fatalf("expected second plan with one file, got %d", len(review.Plans[1].Result.Paths))
+	}
+	if review.Plans[0].Quality.Score == 0 {
+		t.Fatal("expected quality score to be calculated")
 	}
 }
