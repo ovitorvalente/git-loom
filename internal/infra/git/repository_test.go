@@ -128,7 +128,7 @@ func TestRepositoryListFiles(t *testing.T) {
 			invocation: func(repository Repository) ([]string, error) {
 				return repository.ListChangedFiles()
 			},
-			expectedArgs: []string{"diff", "--name-only", "--diff-filter=M"},
+			expectedArgs: []string{"diff", "--name-only", "--diff-filter=MD"},
 		},
 	}
 
@@ -171,7 +171,7 @@ func TestRepositoryStageFiles(t *testing.T) {
 
 	repository := Repository{
 		runCommand: func(name string, args ...string) ([]byte, error) {
-			expectedArgs := []string{"add", "internal/cli/commit.go", "internal/app/commit_service.go"}
+			expectedArgs := []string{"add", "-A", "--", "internal/cli/commit.go", "internal/app/commit_service.go"}
 			if name != "git" {
 				t.Fatalf("expected git command, got %s", name)
 			}
@@ -189,6 +189,34 @@ func TestRepositoryStageFiles(t *testing.T) {
 	}
 
 	err := repository.StageFiles([]string{"internal/cli/commit.go", "internal/app/commit_service.go"})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+}
+
+func TestRepositoryStagesDeletedFiles(t *testing.T) {
+	t.Parallel()
+
+	repository := Repository{
+		runCommand: func(name string, args ...string) ([]byte, error) {
+			expectedArgs := []string{"add", "-A", "--", "configs/default.yaml"}
+			if name != "git" {
+				t.Fatalf("expected git command, got %s", name)
+			}
+			if len(args) != len(expectedArgs) {
+				t.Fatalf("unexpected args: %v", args)
+			}
+			for index, expectedArg := range expectedArgs {
+				if args[index] != expectedArg {
+					t.Fatalf("unexpected arg at %d: %v", index, args)
+				}
+			}
+
+			return []byte(""), nil
+		},
+	}
+
+	err := repository.StageFiles([]string{"configs/default.yaml"})
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
