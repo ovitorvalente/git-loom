@@ -30,6 +30,7 @@ func rootExamples() string {
   gitloom help commit
   gitloom analyze --json
   gitloom config init
+  gitloom doctor
   gitloom version
   gitloom commit
   gitloom commit --dry-run --preview

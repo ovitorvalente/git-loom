@@ -28,6 +28,7 @@ func TestRootCommandHelp(t *testing.T) {
 		"commit",
 		"analyze",
 		"config",
+		"doctor",
 		"version",
 		"Exemplos:",
 		"gitloom help commit",
