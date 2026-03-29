@@ -156,6 +156,10 @@ func buildStructuredDescription(commitType Type, scope string, changes []Change)
 	target := detectTarget(commitType, scope, changes)
 	action := detectAction(commitType, changes)
 
+	if commitType == TypeTest && strings.HasPrefix(target, "testes de ") {
+		return strings.TrimSpace("ajustar " + target)
+	}
+
 	return strings.TrimSpace(action + " " + target)
 }
 
@@ -280,6 +284,8 @@ func detectSpecificTarget(path string) string {
 	switch {
 	case strings.Contains(path, "commit_service.go"):
 		return "commit service"
+	case strings.Contains(path, "commit_feedback.go"):
+		return "feedback de commit"
 	case strings.Contains(path, "branch_service.go"):
 		return "branch service"
 	case strings.Contains(path, "workflow_service.go"):
@@ -304,6 +310,12 @@ func detectSpecificTarget(path string) string {
 		return "visao de commit"
 	case strings.Contains(path, "summary_view.go"):
 		return "resumo"
+	case strings.Contains(path, "messages.go"):
+		return "mensagens"
+	case strings.Contains(path, "intent_detector.go"):
+		return "detector de intencao"
+	case strings.Contains(path, "scope_normalizer.go"):
+		return "normalizador de escopo"
 	case strings.Contains(path, "output.go"):
 		return "output"
 	case strings.Contains(path, "_test.go"):
