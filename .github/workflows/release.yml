@@ -23,7 +23,85 @@ jobs:
           go-version-file: go.mod
 
       - name: Run tests
-        run: go test ./...
+        run: go test -race -count=1 ./...
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          PREV_TAG=$(git tag --sort=-v:refname | grep '^v' | sed -n '2p')
+          if [ -z "$PREV_TAG" ]; then
+            PREV_TAG=$(git rev-list --max-parents=0 HEAD)
+          fi
+
+          echo "## What's Changed" > changelog.md
+          echo "" >> changelog.md
+
+          # Features
+          FEATURES=$(git log --pretty=format:"- %s (%h)" "${PREV_TAG}..${TAG}" | grep -i "^[^-]*feat" || true)
+          if [ -n "$FEATURES" ]; then
+            echo "### 🚀 Features" >> changelog.md
+            echo "$FEATURES" >> changelog.md
+            echo "" >> changelog.md
+          fi
+
+          # Bug Fixes
+          FIXES=$(git log --pretty=format:"- %s (%h)" "${PREV_TAG}..${TAG}" | grep -i "^[^-]*fix" || true)
+          if [ -n "$FIXES" ]; then
+            echo "### 🐛 Bug Fixes" >> changelog.md
+            echo "$FIXES" >> changelog.md
+            echo "" >> changelog.md
+          fi
+
+          # Refactors
+          REFACTORS=$(git log --pretty=format:"- %s (%h)" "${PREV_TAG}..${TAG}" | grep -i "^[^-]*refactor" || true)
+          if [ -n "$REFACTORS" ]; then
+            echo "### ♻️ Refactoring" >> changelog.md
+            echo "$REFACTORS" >> changelog.md
+            echo "" >> changelog.md
+          fi
+
+          # Docs
+          DOCS=$(git log --pretty=format:"- %s (%h)" "${PREV_TAG}..${TAG}" | grep -i "^[^-]*docs" || true)
+          if [ -n "$DOCS" ]; then
+            echo "### 📚 Documentation" >> changelog.md
+            echo "$DOCS" >> changelog.md
+            echo "" >> changelog.md
+          fi
+
+          # Tests
+          TESTS=$(git log --pretty=format:"- %s (%h)" "${PREV_TAG}..${TAG}" | grep -i "^[^-]*test" || true)
+          if [ -n "$TESTS" ]; then
+            echo "### 🧪 Tests" >> changelog.md
+            echo "$TESTS" >> changelog.md
+            echo "" >> changelog.md
+          fi
+
+          # Chores
+          CHORES=$(git log --pretty=format:"- %s (%h)" "${PREV_TAG}..${TAG}" | grep -iE "^[^-]*(chore|ci|build)" || true)
+          if [ -n "$CHORES" ]; then
+            echo "### 🔧 Chores" >> changelog.md
+            echo "$CHORES" >> changelog.md
+            echo "" >> changelog.md
+          fi
+
+          # Breaking changes
+          BREAKING=$(git log --pretty=format:"- %s (%h)" "${PREV_TAG}..${TAG}" | grep -i "BREAKING CHANGE\|!:" || true)
+          if [ -n "$BREAKING" ]; then
+            echo "### ⚠️ Breaking Changes" >> changelog.md
+            echo "$BREAKING" >> changelog.md
+            echo "" >> changelog.md
+          fi
+
+          # Contributors
+          echo "### 👥 Contributors" >> changelog.md
+          git log --format="- @%an" "${PREV_TAG}..${TAG}" | sort -u >> changelog.md
+          echo "" >> changelog.md
+
+          echo "**Full Changelog**: [\`${PREV_TAG}...${TAG}\`](https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${TAG})" >> changelog.md
+
+          echo "---"
+          cat changelog.md
 
       - name: Build release artifacts
         run: make release-artifacts VERSION="${GITHUB_REF_NAME}" GIT_COMMIT="${GITHUB_SHA::7}" BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -32,6 +110,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          generate_release_notes: true
+          body_path: changelog.md
           files: |
             dist/*
