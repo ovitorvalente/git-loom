@@ -28,6 +28,7 @@ type commitOptions struct {
 	yes     bool
 	preview bool
 	strict  bool
+	verbose bool
 }
 
 type commitConfig struct {
@@ -65,11 +66,16 @@ func newCommitCommandWithDependencies(dependencies commitDependencies) *cobra.Co
 	command.Flags().BoolVar(&options.yes, "yes", false, shared.MessageYesFlag)
 	command.Flags().BoolVar(&options.preview, "preview", false, shared.MessagePreviewFlag)
 	command.Flags().BoolVar(&options.strict, "strict", false, shared.MessageStrictFlag)
+	command.Flags().BoolVar(&options.verbose, "verbose", false, shared.MessageVerboseFlag)
 	return command
 }
 
 func runCommitCommand(command *cobra.Command, dependencies commitDependencies, options commitOptions) error {
 	service := app.NewCommitService(dependencies.gitRepository, dependencies.aiProvider)
+	renderer := ui.NewRenderer(ui.RenderOptions{
+		Mode:        renderMode(options),
+		ShowPreview: options.preview,
+	})
 	selectedPaths, err := prepareCommitPaths(command, dependencies, options)
 	if err != nil {
 		return err
@@ -90,7 +96,7 @@ func runCommitCommand(command *cobra.Command, dependencies commitDependencies, o
 			return err
 		}
 	} else if shouldAskToApplySuggestions(options, dependencies.config, review.Suggestions) {
-		printSuggestions(command, review.Suggestions)
+		printSuggestions(command, renderer, review.Suggestions)
 		confirmed, err := ui.ConfirmCommit(command.InOrStdin(), command.OutOrStdout(), shared.MessageApplySuggestions)
 		if err != nil {
 			return err
@@ -106,14 +112,14 @@ func runCommitCommand(command *cobra.Command, dependencies commitDependencies, o
 	}
 
 	for index, plan := range review.Plans {
-		formattedOutput := ui.FormatCommitPlan(index+1, len(review.Plans), plan, options.preview)
+		formattedOutput := renderer.CommitPlan(index+1, len(review.Plans), plan)
 		if _, err := fmt.Fprintf(command.OutOrStdout(), "%s\n", formattedOutput); err != nil {
 			return err
 		}
 	}
 
 	if len(review.Suggestions) > 0 {
-		printSuggestions(command, review.Suggestions)
+		printSuggestions(command, renderer, review.Suggestions)
 	}
 
 	if options.strict {
@@ -127,7 +133,7 @@ func runCommitCommand(command *cobra.Command, dependencies commitDependencies, o
 	}
 
 	if shouldSkipConfirmation(options, dependencies.config) {
-		return createPlannedCommits(command, dependencies.gitRepository, review.Plans, true)
+		return createPlannedCommits(command, dependencies.gitRepository, renderer, review.Plans, true)
 	}
 
 	confirmed, err := ui.ConfirmCommit(command.InOrStdin(), command.OutOrStdout(), shared.MessageCommitPlanQuestion)
@@ -139,7 +145,7 @@ func runCommitCommand(command *cobra.Command, dependencies commitDependencies, o
 		return err
 	}
 
-	return createPlannedCommits(command, dependencies.gitRepository, review.Plans, false)
+	return createPlannedCommits(command, dependencies.gitRepository, renderer, review.Plans, false)
 }
 
 func shouldSkipConfirmation(options commitOptions, configuration commitConfig) bool {
@@ -162,8 +168,9 @@ func shouldAskToApplySuggestions(options commitOptions, configuration commitConf
 	return !shouldSkipConfirmation(options, configuration)
 }
 
-func createPlannedCommits(command *cobra.Command, gitRepository interfaces.GitRepository, plans []app.CommitPlan, autoApprove bool) error {
+func createPlannedCommits(command *cobra.Command, gitRepository interfaces.GitRepository, renderer ui.Renderer, plans []app.CommitPlan, autoApprove bool) error {
 	createdCommits := 0
+	totalScore := 0
 
 	for index, plan := range plans {
 		confirmed, err := confirmPlannedCommit(command, index+1, len(plans), autoApprove)
@@ -185,10 +192,15 @@ func createPlannedCommits(command *cobra.Command, gitRepository interfaces.GitRe
 			return err
 		}
 		createdCommits++
+		totalScore += plan.Quality.Score
 	}
 
 	if createdCommits > 0 {
-		if _, err := fmt.Fprintf(command.OutOrStdout(), "\n%s\n", ui.FormatCommitConclusion()); err != nil {
+		summary, err := buildCommitSummary(gitRepository, createdCommits, totalScore)
+		if err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(command.OutOrStdout(), "\n%s\n", renderer.CommitSummary(summary)); err != nil {
 			return err
 		}
 	}
@@ -206,8 +218,8 @@ func hasAutoApplicableSuggestions(suggestions []app.CommitSuggestion) bool {
 	return false
 }
 
-func printSuggestions(command *cobra.Command, suggestions []app.CommitSuggestion) {
-	formattedSuggestions := ui.FormatSuggestions(suggestions)
+func printSuggestions(command *cobra.Command, renderer ui.Renderer, suggestions []app.CommitSuggestion) {
+	formattedSuggestions := renderer.Suggestions(suggestions)
 	if formattedSuggestions == "" {
 		return
 	}
@@ -244,7 +256,8 @@ func prepareCommitPaths(command *cobra.Command, dependencies commitDependencies,
 			return nil, errors.New(shared.MessagePartialStage)
 		}
 
-		if _, err := fmt.Fprintln(command.OutOrStdout(), ui.FormatChangedFiles(changedPaths)); err != nil {
+		renderer := ui.NewRenderer(ui.RenderOptions{Mode: renderMode(options)})
+		if _, err := fmt.Fprintln(command.OutOrStdout(), renderer.ChangedFiles(changedPaths)); err != nil {
 			return nil, err
 		}
 
@@ -266,6 +279,45 @@ func prepareCommitPaths(command *cobra.Command, dependencies commitDependencies,
 	}
 
 	return selectedPaths, nil
+}
+
+func buildCommitSummary(gitRepository interfaces.GitRepository, createdCommits int, totalScore int) (ui.CommitSummary, error) {
+	stagedPaths, err := gitRepository.ListStagedFiles()
+	if err != nil {
+		return ui.CommitSummary{}, err
+	}
+
+	changedPaths, err := gitRepository.ListChangedFiles()
+	if err != nil {
+		return ui.CommitSummary{}, err
+	}
+
+	return ui.CommitSummary{
+		Created:        createdCommits,
+		AverageQuality: totalScore / createdCommits,
+		Status:         buildWorkingTreeStatus(stagedPaths, changedPaths),
+	}, nil
+}
+
+func buildWorkingTreeStatus(stagedPaths []string, changedPaths []string) string {
+	switch {
+	case len(stagedPaths) == 0 && len(changedPaths) == 0:
+		return "working tree limpa"
+	case len(stagedPaths) > 0 && len(changedPaths) > 0:
+		return "restam mudancas staged e unstaged"
+	case len(stagedPaths) > 0:
+		return "restam mudancas staged"
+	default:
+		return "restam mudancas unstaged"
+	}
+}
+
+func renderMode(options commitOptions) ui.RenderMode {
+	if options.verbose {
+		return ui.RenderModeVerbose
+	}
+
+	return ui.RenderModeClean
 }
 
 func hasPartiallyStagedFiles(stagedPaths []string, changedPaths []string) bool {
