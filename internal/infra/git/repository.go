@@ -33,6 +33,15 @@ func (repository Repository) GetDiff(paths ...string) (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
+func (repository Repository) IsRepository() (bool, error) {
+	output, err := repository.run("git", "rev-parse", "--is-inside-work-tree")
+	if err != nil {
+		return false, nil
+	}
+
+	return strings.TrimSpace(string(output)) == "true", nil
+}
+
 func (repository Repository) ListStagedFiles() ([]string, error) {
 	return repository.listFiles("diff", "--cached", "--name-only", "--diff-filter=ACMR")
 }
