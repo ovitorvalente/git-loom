@@ -3,7 +3,6 @@ package ui
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 )
 
@@ -33,10 +32,6 @@ func NewRenderer(options RenderOptions) Renderer {
 
 func (renderer Renderer) sectionTitle(title string) string {
 	return colorizeLine(accentColor, title+":")
-}
-
-func (renderer Renderer) bulletLine(prefix string, value string) string {
-	return colorizeLine(defaultColor, prefix+" "+value)
 }
 
 func (renderer Renderer) mode() RenderMode {
@@ -89,79 +84,12 @@ func useANSIColors() bool {
 	return os.Getenv("NO_COLOR") == ""
 }
 
-func horizontalRule() string {
-	return strings.Repeat("─", 60)
-}
-
 func colorizeText(color string, value string) string {
 	if !useANSIColors() || strings.TrimSpace(color) == "" {
 		return value
 	}
 
 	return "\x1b[" + color + "m" + value + "\x1b[0m"
-}
-
-func padRight(value string, width int) string {
-	if len(value) >= width {
-		return value
-	}
-
-	return value + strings.Repeat(" ", width-len(value))
-}
-
-func max(values ...int) int {
-	result := 0
-	for _, value := range values {
-		if value > result {
-			result = value
-		}
-	}
-
-	return result
-}
-
-func styledPanel(lines []string) string {
-	visibleWidth := 0
-	for _, line := range lines {
-		if len(line) > visibleWidth {
-			visibleWidth = len(line)
-		}
-	}
-
-	if visibleWidth == 0 {
-		return ""
-	}
-
-	panelWidth := visibleWidth + 2
-	output := make([]string, 0, len(lines)+2)
-	topBorder := colorizeText(panelBorderColor, "┌"+strings.Repeat("─", panelWidth)+"┐")
-	bottomBorder := colorizeText(panelBorderColor, "└"+strings.Repeat("─", panelWidth)+"┘")
-	output = append(output, topBorder)
-
-	for _, line := range lines {
-		padded := " " + padRight(line, visibleWidth) + " "
-		body := colorizeText(panelBackground+";"+panelTextColor, padded)
-		output = append(output, colorizeText(panelBorderColor, "│")+body+colorizeText(panelBorderColor, "│"))
-	}
-
-	output = append(output, bottomBorder)
-	return strings.Join(output, "\n")
-}
-
-func scoreText(score int) string {
-	color := successColor
-	switch {
-	case score >= 90:
-		color = successColor
-	case score >= 80:
-		color = accentColor
-	case score >= 70:
-		color = warningColor
-	default:
-		color = dangerColor
-	}
-
-	return colorizeText(color, strconv.Itoa(score)+"/100")
 }
 
 func splitCommitMessage(message string) (string, string) {
