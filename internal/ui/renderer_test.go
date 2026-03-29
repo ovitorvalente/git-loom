@@ -165,7 +165,7 @@ func TestRendererCommitSummary(t *testing.T) {
 	})
 
 	expectedParts := []string{
-		"✔ 1 commit criado",
+		"☕ 1 commit criado",
 		"qualidade media:",
 		"85",
 		"bom",
