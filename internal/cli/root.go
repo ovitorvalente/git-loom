@@ -12,6 +12,9 @@ func newRootCommand() *cobra.Command {
 		Short:         shared.MessageRootShort,
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		CompletionOptions: cobra.CompletionOptions{
+			DisableDefaultCmd: true,
+		},
 	}
 
 	command.AddCommand(newCommitCommand())
