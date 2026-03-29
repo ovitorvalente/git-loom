@@ -23,6 +23,7 @@ func newRootCommand() *cobra.Command {
 	command.AddCommand(newCommitCommand())
 	command.AddCommand(newAnalyzeCommand())
 	command.AddCommand(newConfigCommand())
+	command.AddCommand(newDoctorCommand())
 	command.AddCommand(newVersionCommand())
 	return command
 }
