@@ -11,10 +11,7 @@ import (
 func TestGitRepositoryImplementsInterface(t *testing.T) {
 	t.Parallel()
 
-	var repository interfaces.GitRepository = &mocks.GitRepository{}
-	if repository == nil {
-		t.Fatal("expected git repository mock to implement interface")
-	}
+	var _ interfaces.GitRepository = &mocks.GitRepository{}
 }
 
 func TestGitRepositoryTracksCalls(t *testing.T) {
@@ -79,10 +76,7 @@ func TestGitRepositoryTracksCalls(t *testing.T) {
 func TestAIProviderImplementsInterface(t *testing.T) {
 	t.Parallel()
 
-	var provider interfaces.AIProvider = &mocks.AIProvider{}
-	if provider == nil {
-		t.Fatal("expected ai provider mock to implement interface")
-	}
+	var _ interfaces.AIProvider = &mocks.AIProvider{}
 }
 
 func TestAIProviderTracksCalls(t *testing.T) {
