@@ -195,7 +195,7 @@ func TestRendererFinalPreview(t *testing.T) {
 		},
 		{
 			Result: app.CommitResult{
-				Message: "feat(cli): adicionar comando",
+				Message: "feat(cli): adicionar commando",
 				Commit: domaincommit.Model{
 					Type:  domaincommit.TypeFeat,
 					Scope: "cli",
