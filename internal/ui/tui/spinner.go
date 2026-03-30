@@ -41,10 +41,10 @@ func RunWithSpinner(msg string, fn func() error) error {
 }
 
 type spinnerModel struct {
-	spinner     spinner.Model
-	message     string
-	fn          func() error
 	err         error
+	fn          func() error
+	message     string
+	spinner     spinner.Model
 	done        bool
 	fnDone      bool
 	minTimeDone bool
