@@ -18,7 +18,6 @@ var (
 	colorScope   = lipgloss.Color("219")
 	colorBright  = lipgloss.Color("252")
 	colorBorder  = lipgloss.Color("240")
-	colorBg      = lipgloss.Color("236")
 )
 
 var (
@@ -148,7 +147,7 @@ func StyleForScore(score int) lipgloss.Style {
 }
 
 func ScoreBadge(score int) string {
-	label := "bom"
+	var label string
 	switch {
 	case score >= 90:
 		label = "excelente"
