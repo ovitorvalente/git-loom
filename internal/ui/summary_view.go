@@ -97,7 +97,7 @@ func (renderer Renderer) FinalPreview(plans []app.CommitPlan) string {
 }
 
 type CommitSummary struct {
+	Status         string
 	Created        int
 	AverageQuality int
-	Status         string
 }

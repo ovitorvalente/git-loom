@@ -102,20 +102,22 @@ func splitCommitMessage(message string) (string, string) {
 }
 
 func scoreBadge(score int) string {
-	color := successColor
-	label := "bom"
+	var color string
+	var label string
 
 	switch {
 	case score >= 90:
 		label = "excelente"
+		color = successColor
 	case score >= 80:
 		label = "bom"
+		color = successColor
 	case score >= 70:
-		color = warningColor
 		label = "aceitavel"
+		color = warningColor
 	default:
-		color = dangerColor
 		label = "critico"
+		color = dangerColor
 	}
 
 	return colorizeLine(color, fmt.Sprintf("[%d] %s", score, label))
