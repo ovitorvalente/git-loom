@@ -54,10 +54,10 @@ func ScoreCommit(intent ChangeIntent, context CommitContext) CommitQuality {
 
 	if hasMixedScopes(context.Files) {
 		score -= 15
-		reasons = append(reasons, "arquivos misturam contextos diferentes")
+		reasons = append(reasons, "arquivos misturam contexts diferentes")
 		criteria = append(criteria, QualityCriteria{
 			Name: "coerencia", Passed: false, Warning: true,
-			Message: "contextos mistos",
+			Message: "contexts mistos",
 		})
 	} else {
 		criteria = append(criteria, QualityCriteria{

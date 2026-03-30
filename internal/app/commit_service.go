@@ -33,11 +33,11 @@ type CommitResult struct {
 }
 
 type CommitPlan struct {
-	Result        CommitResult
-	Preview       semantic.CommitPreview
-	Quality       semantic.CommitQuality
-	Context       semantic.CommitContext
 	SemanticGroup string
+	Result        CommitResult
+	Context       semantic.CommitContext
+	Quality       semantic.CommitQuality
+	Preview       semantic.CommitPreview
 }
 
 type CommitPreview = semantic.CommitPreview

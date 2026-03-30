@@ -32,15 +32,15 @@ type CommitPreview struct {
 
 type QualityCriteria struct {
 	Name    string
+	Message string
 	Passed  bool
 	Warning bool
-	Message string
 }
 
 type CommitQuality struct {
-	Score    int
-	Reasons  []string
 	Criteria []QualityCriteria
+	Reasons  []string
+	Score    int
 }
 
 func NewCommitContext(diff string) CommitContext {
