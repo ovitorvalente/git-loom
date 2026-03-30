@@ -7,7 +7,27 @@ PLATFORMS ?= darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64 win
 GO_CACHE_DIR ?= .cache/go-build
 LDFLAGS = -X github.com/ovitorvalente/git-loom/internal/cli.Version=$(VERSION) -X github.com/ovitorvalente/git-loom/internal/cli.GitCommit=$(GIT_COMMIT) -X github.com/ovitorvalente/git-loom/internal/cli.BuildDate=$(BUILD_DATE)
 
-.PHONY: test vet build clean dist dist-checkums release-artifacts
+.PHONY: test vet build clean dist dist-checksums release-artifacts install uninstall
+
+INSTALL_VERSION ?= latest
+INSTALL_DIR ?=
+INSTALL_MODE ?= auto
+
+install:
+	@if [ -n "$(INSTALL_DIR)" ]; then \
+		curl -sSL https://raw.githubusercontent.com/ovitorvalente/git-loom/main/scripts/install.sh | bash -s -- -v $(INSTALL_VERSION) -d "$(INSTALL_DIR)" -m $(INSTALL_MODE); \
+	else \
+		curl -sSL https://raw.githubusercontent.com/ovitorvalente/git-loom/main/scripts/install.sh | bash -s -- -v $(INSTALL_VERSION) -m $(INSTALL_MODE); \
+	fi
+
+uninstall:
+	@curl -sSL https://raw.githubusercontent.com/ovitorvalente/git-loom/main/scripts/install.sh | bash -s -- -u
+
+install-local: build
+	@mkdir -p ~/.local/bin 2>/dev/null || true
+	@cp $(BINARY_NAME) ~/.local/bin/
+	@chmod +x ~/.local/bin/$(BINARY_NAME)
+	@echo "Installed to ~/.local/bin/$(BINARY_NAME)"
 
 test:
 	go test ./...
