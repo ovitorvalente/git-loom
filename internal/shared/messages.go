@@ -22,7 +22,7 @@ const (
 	MessageChangedFiles         = "arquivos em changes:"
 	MessageStageChangedQuestion = "adicionar arquivos em changes ao staged?"
 	MessageEmptyDiff            = "nenhuma mudanca staged encontrada; execute git add antes de gitloom commit"
-	MessagePartialStage         = "arquivos parcialmente staged ainda nao sao suportados neste fluxo automatico; finalize ou descarte as mudancas unstaged antes de continuar"
+	MessagePartialStage         = "arquivos parcialmente staged ainda nao sao suportados neste fluxo automatico; finalize ou descarte as mudancas unstaged antes de continuar" //nolint:misspell
 	MessageStrictModeFailed     = "modo estrito falhou: existem commits com qualidade abaixo do minimo aceitavel"
 	MessageCommitPromptSuffix   = "[Y/n]: "
 	MessageFilesLabel           = "arquivos"

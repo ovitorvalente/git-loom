@@ -25,26 +25,22 @@ type CommitToggle struct {
 }
 
 type appModel struct {
-	state   viewState
-	spinner spinner.Model
-	width   int
-	height  int
-	ready   bool
-
-	// analyze
-	analyzing bool
-
-	// review
 	commits   []CommitToggle
+	spinner   spinner.Model
+	state     viewState
 	cursor    int
+	width     int
+	height    int
+	ready     bool
+	analyzing bool
 	confirmed bool
-	cancelled bool
+	canceled  bool
 }
 
 type AppResult struct {
 	Approved  []bool
 	Confirmed bool
-	Cancelled bool
+	Canceled  bool
 }
 
 func newAppModel(plans []app.CommitPlan) appModel {
@@ -76,7 +72,6 @@ func (m appModel) Init() tea.Cmd {
 }
 
 type analyzeDoneMsg struct{}
-type tickMsg struct{}
 
 func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -114,7 +109,7 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m appModel) handleReviewKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "ctrl+c", "esc", "q":
-		m.cancelled = true
+		m.canceled = true
 		return m, tea.Quit
 	case "enter":
 		m.confirmed = true
@@ -317,7 +312,7 @@ func (m appModel) result() AppResult {
 	return AppResult{
 		Approved:  approved,
 		Confirmed: m.confirmed,
-		Cancelled: m.cancelled,
+		Canceled:  m.canceled,
 	}
 }
 
@@ -345,5 +340,5 @@ func RunCommitTUI(plans []app.CommitPlan) (AppResult, error) {
 		return fm.result(), nil
 	}
 
-	return AppResult{Cancelled: true}, nil
+	return AppResult{Canceled: true}, nil
 }
