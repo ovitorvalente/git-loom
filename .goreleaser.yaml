@@ -1,0 +1,68 @@
+version: 2
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - id: gitloom
+    dir: .
+    main: ./cmd/gitloom
+    binary: gitloom
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/ovitorvalente/git-loom/internal/cli.Version={{ .Version }}
+      - -X github.com/ovitorvalente/git-loom/internal/cli.GitCommit={{ .Commit }}
+      - -X github.com/ovitorvalente/git-loom/internal/cli.BuildDate={{ .Date }}
+
+archives:
+  - id: default
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ .Tag }}-next"
+
+changelog:
+  use: github
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - '^refactor:'
+      - '^style:'
+
+release:
+  github:
+    owner: ovitorvalente
+    name: git-loom
+  draft: false
+  prerelease: auto
+
+nfpms:
+  - id: default
+    package_name: gitloom
+    maintainer: ovitorvalente
+    description: CLI tool for semantic commit management
+    license: MIT
+    homepage: https://github.com/ovitorvalente/git-loom
+    formats:
+      - deb
+      - rpm

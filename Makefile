@@ -7,7 +7,7 @@ PLATFORMS ?= darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64 win
 GO_CACHE_DIR ?= .cache/go-build
 LDFLAGS = -X github.com/ovitorvalente/git-loom/internal/cli.Version=$(VERSION) -X github.com/ovitorvalente/git-loom/internal/cli.GitCommit=$(GIT_COMMIT) -X github.com/ovitorvalente/git-loom/internal/cli.BuildDate=$(BUILD_DATE)
 
-.PHONY: test vet build clean dist dist-checksums release-artifacts install uninstall
+.PHONY: test vet build clean dist dist-checksums release-artifacts install uninstall release snapshot
 
 INSTALL_VERSION ?= latest
 INSTALL_DIR ?=
@@ -77,3 +77,9 @@ dist-checksums:
 	fi
 
 release-artifacts: dist
+
+release:
+	@goreleaser release --clean
+
+snapshot:
+	@goreleaser build --snapshot --clean -o dist/gitloom
