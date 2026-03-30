@@ -66,16 +66,16 @@ OPTIONS:
 
 EXAMPLES:
     # Install latest version
-    curl -sSL https://raw.githubusercontent.com/${GITHUB_REPO}/main/scripts/install.sh | bash
+    curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPO}/main/scripts/install.sh | bash
 
     # Install specific version
-    curl -sSL https://raw.githubusercontent.com/${GITHUB_REPO}/main/scripts/install.sh | bash -s -- -v 1.2.3
+    curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPO}/main/scripts/install.sh | bash -s -- -v 0.1.0-alpha
 
     # Install to custom directory
-    curl -sSL https://raw.githubusercontent.com/${GITHUB_REPO}/main/scripts/install.sh | bash -s -- -d ~/.local/bin
+    curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPO}/main/scripts/install.sh | bash -s -- -d ~/.local/bin
 
     # Uninstall
-    curl -sSL https://raw.githubusercontent.com/${GITHUB_REPO}/main/scripts/install.sh | bash -s -- -u
+    curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPO}/main/scripts/install.sh | bash -s -- -u
 
 MODES:
     auto    - Install system-wide if root, otherwise user directory

@@ -125,6 +125,18 @@ ok sem alertas relevantes
 
 ## Instalacao
 
+### curl (recomendado)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ovitorvalente/git-loom/main/scripts/install.sh | bash
+```
+
+Para instalar uma versao especifica:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ovitorvalente/git-loom/main/scripts/install.sh | bash -s -- -v 0.1.0-alpha
+```
+
 ### Go
 
 ```bash
