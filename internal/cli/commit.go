@@ -87,51 +87,53 @@ func runCommitCommand(command *cobra.Command, dependencies commitDependencies, o
 	renderer := execution.renderer
 
 	if shouldAutoApplySuggestions(options, dependencies.config, review.Suggestions) {
-		review, err = service.ApplySuggestions(review, app.GenerateCommitOptions{
+		updatedReview, applyErr := service.ApplySuggestions(review, app.GenerateCommitOptions{
 			Scope: dependencies.config.DefaultScope,
 		})
-		if err != nil {
-			return err
+		if applyErr != nil {
+			return applyErr
 		}
+		review = updatedReview
 		execution.review = review
 	} else if shouldAskToApplySuggestions(options, dependencies.config, review.Suggestions) {
 		printSuggestions(command, renderer, review.Suggestions)
-		confirmed, err := ui.ConfirmCommit(command.InOrStdin(), command.OutOrStdout(), shared.MessageApplySuggestions)
-		if err != nil {
-			return err
+		confirmed, confirmErr := ui.ConfirmCommit(command.InOrStdin(), command.OutOrStdout(), shared.MessageApplySuggestions)
+		if confirmErr != nil {
+			return confirmErr
 		}
 		if confirmed {
-			review, err = service.ApplySuggestions(review, app.GenerateCommitOptions{
+			updatedReview, applyErr := service.ApplySuggestions(review, app.GenerateCommitOptions{
 				Scope: dependencies.config.DefaultScope,
 			})
-			if err != nil {
-				return err
+			if applyErr != nil {
+				return applyErr
 			}
+			review = updatedReview
 			execution.review = review
 		}
 	}
 
 	if options.review.strict {
-		if err := validateStrictReview(review); err != nil {
-			return err
+		if strictErr := validateStrictReview(review); strictErr != nil {
+			return strictErr
 		}
 	}
 
 	if !options.review.json || options.dryRun || options.review.preview {
-		if err := printReview(command, execution, options.review); err != nil {
-			return err
+		if printErr := printReview(command, execution, options.review); printErr != nil {
+			return printErr
 		}
 	}
 
 	if options.dryRun || options.review.preview {
 		if !options.review.json && len(review.Plans) > 1 {
-			result, err := tui.RunCommitTUI(review.Plans)
-			if err != nil {
-				return err
+			result, runErr := tui.RunCommitTUI(review.Plans)
+			if runErr != nil {
+				return runErr
 			}
-			if result.Cancelled {
-				_, err := fmt.Fprintln(command.OutOrStdout(), shared.MessageCommitCanceled)
-				return err
+			if result.Canceled {
+				_, printErr := fmt.Fprintln(command.OutOrStdout(), shared.MessageCommitCanceled)
+				return printErr
 			}
 		}
 		return nil
@@ -185,7 +187,7 @@ func createPlannedCommits(command *cobra.Command, gitRepository interfaces.GitRe
 		if err != nil {
 			return err
 		}
-		if result.Cancelled {
+		if result.Canceled {
 			_, err := fmt.Fprintln(command.OutOrStdout(), shared.MessageCommitCanceled)
 			return err
 		}

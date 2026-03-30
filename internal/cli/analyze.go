@@ -61,7 +61,7 @@ func runAnalyzeCommand(command *cobra.Command, dependencies commitDependencies, 
 func analyzeHelpText() string {
 	return `Analisa o estado atual do repositorio e mostra o plano de commits sem criar commits.
 
-Use este comando para:
+Use este commando para:
   - revisar agrupamento antes de commitar
   - inspecionar score, detalhes e sugestoes
   - exportar a revisao em json para scripts

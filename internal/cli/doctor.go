@@ -72,12 +72,12 @@ func runDoctorCommand(command *cobra.Command, dependencies commitDependencies, o
 	}
 
 	if options.json {
-		payload, err := json.MarshalIndent(report, "", "  ")
-		if err != nil {
-			return err
+		payload, marshalErr := json.MarshalIndent(report, "", "  ")
+		if marshalErr != nil {
+			return marshalErr
 		}
-		_, err = fmt.Fprintln(command.OutOrStdout(), string(payload))
-		return err
+		_, printErr := fmt.Fprintln(command.OutOrStdout(), string(payload))
+		return printErr
 	}
 
 	lines := []string{"◆ doctor"}
@@ -206,7 +206,7 @@ func buildWorkingTreeCheck(stagedPaths []string, changedPaths []string, partialP
 	}
 	if len(partialPaths) > 0 {
 		status = "fail"
-		message = "existem arquivos parcialmente staged; o fluxo automatico nao suporta esse estado"
+		message = "existem arquivos parcialmente staged; o fluxo automation nao suporta esse estado"
 		details = append(details, "parcialmente staged: "+strings.Join(partialPaths, ", "))
 	}
 
@@ -273,11 +273,11 @@ func partiallyStagedPaths(stagedPaths []string, changedPaths []string) []string 
 func doctorHelpText() string {
 	return `Valida se o repositorio e o ambiente atual estao prontos para usar o gitloom.
 
-O comando inspeciona:
+O commando inspeciona:
   - repositorio git
   - configuracao local
   - estado do stage e do working tree
-  - bloqueios conhecidos do fluxo automatico`
+  - bloqueios conhecidos do fluxo automation`
 }
 
 func doctorExamples() string {
