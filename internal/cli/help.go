@@ -5,7 +5,7 @@ const rootHelpTemplate = `{{with or .Long .Short}}{{. | trimTrailingWhitespaces}
 Uso:
   {{.UseLine}}
 
-{{if .HasAvailableSubCommands}}Comandos:
+{{if .HasAvailableSubCommands}}Commands:
 {{range .Commands}}{{if (and .IsAvailableCommand (not .IsAdditionalHelpTopicCommand))}}  {{rpad .Name .NamePadding }} {{.Short}}
 {{end}}{{end}}{{end}}{{if .HasAvailableLocalFlags}}
 Flags:
@@ -40,11 +40,11 @@ func rootExamples() string {
 func commitHelpText() string {
 	return `Planeja e cria commits semanticos a partir do estado atual do repositorio.
 
-O comando:
+O commando:
   - le arquivos staged
   - detecta arquivos em changes e oferece adicionar ao stage
   - agrupa mudancas relacionadas em blocos pequenos
-  - gera mensagem semantica em portugues
+  - gera mensagem semantica em Portuguese
   - mostra score, detalhes, analise e sugestoes antes de commitar
   - confirma cada bloco, ou executa direto com --yes`
 }

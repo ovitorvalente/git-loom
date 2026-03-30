@@ -28,28 +28,28 @@ type reviewExecution struct {
 
 type jsonReviewOutput struct {
 	Plans       []jsonPlanOutput         `json:"plans"`
-	Suggestions []app.CommitSuggestion   `json:"suggestions,omitempty"`
 	Summary     *jsonReviewSummaryOutput `json:"summary,omitempty"`
+	Suggestions []app.CommitSuggestion   `json:"suggestions,omitempty"`
 }
 
 type jsonCommitExecutionOutput struct {
+	Summary     *jsonReviewSummaryOutput   `json:"summary,omitempty"`
 	Plans       []jsonPlanOutput           `json:"plans"`
 	Suggestions []app.CommitSuggestion     `json:"suggestions,omitempty"`
-	Summary     *jsonReviewSummaryOutput   `json:"summary,omitempty"`
 	Execution   jsonCommitExecutionSummary `json:"execution"`
 }
 
 type jsonPlanOutput struct {
-	Index       int                `json:"index"`
-	Total       int                `json:"total"`
 	Message     string             `json:"message"`
 	Type        string             `json:"type"`
 	Scope       string             `json:"scope,omitempty"`
 	Description string             `json:"description,omitempty"`
-	Paths       []string           `json:"paths"`
-	Preview     app.CommitPreview  `json:"preview"`
-	Quality     app.CommitQuality  `json:"quality"`
 	Feedback    app.CommitFeedback `json:"feedback"`
+	Paths       []string           `json:"paths"`
+	Quality     app.CommitQuality  `json:"quality"`
+	Preview     app.CommitPreview  `json:"preview"`
+	Index       int                `json:"index"`
+	Total       int                `json:"total"`
 }
 
 type jsonReviewSummaryOutput struct {
@@ -60,16 +60,16 @@ type jsonReviewSummaryOutput struct {
 }
 
 type jsonCommitExecutionSummary struct {
+	Status         string              `json:"status"`
 	CreatedCommits []jsonCreatedCommit `json:"created_commits,omitempty"`
 	SkippedCommits []jsonSkippedCommit `json:"skipped_commits,omitempty"`
 	AverageQuality int                 `json:"average_quality"`
-	Status         string              `json:"status"`
 }
 
 type jsonCreatedCommit struct {
-	Index   int      `json:"index"`
 	Message string   `json:"message"`
 	Paths   []string `json:"paths"`
+	Index   int      `json:"index"`
 }
 
 type jsonSkippedCommit struct {
