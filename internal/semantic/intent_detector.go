@@ -30,9 +30,9 @@ func buildIntentDescription(commitType string, scope string, target string, cont
 		}
 		return "atualizar documentacao principal do projeto"
 	case "deps":
-		return "atualizar dependencias do projeto"
+		return "atualizar dependencies do projeto"
 	case "build":
-		return "ajustar comandos de desenvolvimento"
+		return "ajustar commandos de desenvolvimento"
 	case "config":
 		if containsTag(context.Tags, "strict") {
 			return "ajustar configuracao do modo estrito"
@@ -108,15 +108,15 @@ func normalizeIntentTarget(scope string, path string) string {
 	case path == "README.md":
 		return "documentacao principal do projeto"
 	case path == "go.mod" || path == "go.sum":
-		return "dependencias do projeto"
+		return "dependencies do projeto"
 	case path == "Makefile":
-		return "comandos de desenvolvimento"
+		return "commandos de desenvolvimento"
 	case path == ".gitloom.yaml":
 		return "configuracao do projeto"
 	case strings.HasSuffix(path, "main.go"):
 		return "inicializacao do cli"
 	case strings.HasSuffix(path, "root.go"):
-		return "comando raiz"
+		return "commando raiz"
 	case strings.HasSuffix(path, "commit.go"):
 		return "fluxo de commit"
 	case strings.HasSuffix(path, "commit_service.go"):
@@ -167,7 +167,7 @@ func detectIntentReason(scope string, target string, context CommitContext) stri
 	case scope == "readme":
 		return "melhorar a clareza de uso para quem adota o projeto"
 	case scope == "deps":
-		return "manter as dependencias alinhadas com a versao atual do projeto"
+		return "manter as dependencies alinhadas com a versao atual do projeto"
 	case scope == "build":
 		return "simplificar o fluxo de desenvolvimento local"
 	case scope == "config":
