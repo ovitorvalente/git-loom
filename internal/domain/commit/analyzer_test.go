@@ -31,7 +31,7 @@ func TestAnalyzeDiff(t *testing.T) {
 	if !strings.Contains(analysis.Body, "- atualiza commit service em app") {
 		t.Fatalf("expected body to mention updated file, got %q", analysis.Body)
 	}
-	if !strings.Contains(analysis.Body, "- adiciona comando commit em cli") {
+	if !strings.Contains(analysis.Body, "- adiciona comando commit em cli") { //nolint:misspell
 		t.Fatalf("expected body to mention added file, got %q", analysis.Body)
 	}
 }

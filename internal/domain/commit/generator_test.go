@@ -11,8 +11,8 @@ func TestGenerateMessage(t *testing.T) {
 	testCases := []struct {
 		name        string
 		model       Model
-		expected    string
 		expectedErr error
+		expected    string
 	}{
 		{
 			name: "generates message with scope and body",

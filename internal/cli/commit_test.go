@@ -475,7 +475,7 @@ func TestCommitCommandRejectsPartiallyStagedFiles(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if err.Error() != "arquivos parcialmente staged ainda nao sao suportados neste fluxo automatico; finalize ou descarte as mudancas unstaged antes de continuar" {
+	if err.Error() != "arquivos parcialmente staged ainda nao sao suportados neste fluxo automatico; finalize ou descarte as mudancas unstaged antes de continuar" { //nolint:misspell
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

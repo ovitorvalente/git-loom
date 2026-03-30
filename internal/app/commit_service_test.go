@@ -16,15 +16,15 @@ func TestCommitServiceGenerateCommit(t *testing.T) {
 	aiError := errors.New("ai failed")
 
 	testCases := []struct {
-		name              string
+		expectedError     error
 		gitRepository     *mocks.GitRepository
 		aiProvider        *mocks.AIProvider
+		name              string
 		options           GenerateCommitOptions
 		expectedType      domaincommit.Type
-		expectedMessage   string
 		expectedDiff      string
+		expectedMessage   string
 		expectedAIInvokes int
-		expectedError     error
 	}{
 		{
 			name: "returns generated message without ai provider",
@@ -34,7 +34,7 @@ func TestCommitServiceGenerateCommit(t *testing.T) {
 				},
 			},
 			expectedType:      domaincommit.TypeFeat,
-			expectedMessage:   "feat(cli): adicionar fluxo de commit\n\n- adiciona comando commit em cli",
+			expectedMessage:   "feat(cli): adicionar fluxo de commit\n\n- adiciona comando commit em cli", //nolint:misspell
 			expectedDiff:      "diff --git a/internal/cli/commit.go b/internal/cli/commit.go\nnew file mode 100644\n",
 			expectedAIInvokes: 0,
 		},
