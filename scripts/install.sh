@@ -40,13 +40,13 @@ log_error() {
 
 print_banner() {
     echo ""
-    echo -e "${BOLD}  ███████╗██╗   ██╗███╗   ███╗██╗███████╗";
-    echo -e "  ██╔════╝╚██╗ ██╔╝████╗ ████║██║██╔════╝";
-    echo -e "  █████╗   ╚████╔╝ ██╔████╔██║██║███████╗";
-    echo -e "  ██╔══╝    ╚██╔╝  ██║╚██╔╝██║██║╚════██║";
-    echo -e "  ███████╗   ██║   ██║ ╚═╝ ██║██║███████║";
-    echo -e "  ╚══════╝   ╚═╝   ╚═╝     ╚═╝╚═╝╚══════╝${NC}";
-    echo -e "${BOLD}  Git Workflow Automation${NC}"
+    echo -e "${BOLD}  ██████╗ ███████╗███████╗██╗     ██╗███╗   ██╗███████╗";
+    echo -e "  ██╔══██╗██╔════╝██╔════╝██║     ██║████╗  ██║██╔════╝";
+    echo -e "  ██║  ██║█████╗  █████╗  ██║     ██║██╔██╗ ██║█████╗  ";
+    echo -e "  ██║  ██║██╔══╝  ██╔══╝  ██║     ██║██║╚██╗██║██╔══╝  ";
+    echo -e "  ██████╔╝███████╗██║     ███████╗██║██║ ╚████║███████╗";
+    echo -e "  ╚═════╝ ╚══════╝╚═╝     ╚══════╝╚═╝╚═╝  ╚═══╝╚══════╝${NC}";
+    echo -e "${BOLD}  Smart Git Commits${NC}"
     echo ""
 }
 
@@ -113,6 +113,11 @@ get_latest_version() {
     echo "${version}"
 }
 
+get_version_for_filename() {
+    local tag_version="$1"
+    echo "$tag_version" | sed 's/-.*$//'
+}
+
 check_curl() {
     if ! command -v curl &> /dev/null; then
         log_error "curl is required but not installed"
@@ -135,9 +140,7 @@ check_deps() {
 
 download_checksum() {
     local version="$1"
-    local os="$2"
-    local arch="$3"
-    local checksum_url="https://github.com/${GITHUB_REPO}/releases/download/v${version}/gitloom_v${version}_checksums.txt"
+    local checksum_url="https://github.com/${GITHUB_REPO}/releases/download/v${version}/checksums.txt"
     curl -sSL "$checksum_url" 2>/dev/null || echo ""
 }
 
@@ -166,15 +169,16 @@ verify_checksum() {
 
 get_download_url() {
     local version="$1"
-    local os="$2"
-    local arch="$3"
+    local version_filename="$2"
+    local os="$3"
+    local arch="$4"
     
     local ext="tar.gz"
     if [ "$os" = "windows" ]; then
         ext="zip"
     fi
     
-    echo "https://github.com/${GITHUB_REPO}/releases/download/v${version}/gitloom_v${version}_${os}_${arch}.${ext}"
+    echo "https://github.com/${GITHUB_REPO}/releases/download/v${version}/gitloom_v${version_filename}_${os}_${arch}.${ext}"
 }
 
 do_install() {
@@ -185,6 +189,7 @@ do_install() {
     local arch
     local install_dir
     local bin_name="gitloom"
+    local version_for_filename
     
     os=$(get_os)
     arch=$(get_arch)
@@ -193,6 +198,8 @@ do_install() {
         log_info "Fetching latest version..."
         version=$(get_latest_version)
     fi
+    
+    version_for_filename=$(get_version_for_filename "$version")
     
     log_info "Version: ${BOLD}${version}${NC}"
     log_info "OS: ${BOLD}${os}${NC}"
@@ -248,7 +255,7 @@ do_install() {
         ext="zip"
     fi
     
-    download_url=$(get_download_url "$version" "$os" "$arch")
+    download_url=$(get_download_url "$version" "$version_for_filename" "$os" "$arch")
     archive_file="${tmp_dir}/gitloom.${ext}"
     
     log_info "Downloading..."
@@ -269,7 +276,7 @@ do_install() {
     # Verify
     if [ -n "$checksums" ]; then
         local expected_sum
-        expected_sum=$(echo "$checksums" | grep "${os}_${arch}.${ext}" | awk '{print $1}' || echo "")
+        expected_sum=$(echo "$checksums" | grep "${os}_${arch}\.${ext}" | awk '{print $1}' || echo "")
         verify_checksum "$archive_file" "$expected_sum"
     fi
     
@@ -277,15 +284,16 @@ do_install() {
     log_info "Installing..."
     mkdir -p "$install_dir"
     
+    local archive_dir="gitloom_v${version_for_filename}_${os}_${arch}"
+    
     if [ "$ext" = "zip" ]; then
         unzip -o "$archive_file" -d "$tmp_dir" > /dev/null
-        mv "${tmp_dir}/gitloom.exe" "${install_dir}/${bin_name}.exe" 2>/dev/null || \
-        mv "${tmp_dir}/${bin_name}.exe" "${install_dir}/${bin_name}.exe" 2>/dev/null || \
+        mv "${tmp_dir}/${archive_dir}/gitloom.exe" "${install_dir}/${bin_name}.exe" 2>/dev/null || \
         unzip -j "$archive_file" "*/gitloom.exe" -d "$install_dir" > /dev/null
         chmod +x "${install_dir}/${bin_name}.exe"
     else
         tar xzf "$archive_file" -C "$tmp_dir"
-        mv "${tmp_dir}/gitloom" "${install_dir}/${bin_name}"
+        mv "${tmp_dir}/${archive_dir}/gitloom" "${install_dir}/${bin_name}"
         chmod +x "${install_dir}/${bin_name}"
     fi
     
