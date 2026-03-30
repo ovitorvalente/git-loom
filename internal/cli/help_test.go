@@ -24,7 +24,7 @@ func TestRootCommandHelp(t *testing.T) {
 
 	expectedParts := []string{
 		"Git Loom automatiza commits semanticos com revisao antes de executar.",
-		"Comandos:",
+		"Commands:",
 		"commit",
 		"analyze",
 		"config",

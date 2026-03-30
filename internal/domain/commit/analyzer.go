@@ -291,11 +291,11 @@ func detectSpecificTarget(path string) string {
 	case strings.Contains(path, "workflow_service.go"):
 		return "workflow service"
 	case strings.Contains(path, "commit.go"):
-		return "comando commit"
+		return "comando commit" //nolint:misspell
 	case strings.Contains(path, "branch.go"):
-		return "comando branch"
+		return "comando branch" //nolint:misspell
 	case strings.Contains(path, "root.go"):
-		return "comando raiz"
+		return "comando raiz" //nolint:misspell
 	case strings.Contains(path, "loader.go"):
 		return "loader de configuracao"
 	case strings.Contains(path, "schema.go"):
