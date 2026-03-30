@@ -8,14 +8,14 @@ import (
 
 type ScopeSuggestion struct {
 	Current      string
-	Generic      bool
 	Alternatives []string
+	Generic      bool
 }
 
 type DescriptionSuggestion struct {
+	Reason  string
 	Current string
 	Generic bool
-	Reason  string
 }
 
 func SuggestScope(scope string, files []ChangedFile) ScopeSuggestion {
