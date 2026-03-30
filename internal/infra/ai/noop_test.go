@@ -9,10 +9,7 @@ import (
 func TestNoopProviderImplementsInterface(t *testing.T) {
 	t.Parallel()
 
-	var provider interfaces.AIProvider = NewNoopProvider()
-	if provider == nil {
-		t.Fatal("expected noop provider to implement interface")
-	}
+	var _ interfaces.AIProvider = NewNoopProvider()
 }
 
 func TestNoopProviderGenerateCommit(t *testing.T) {

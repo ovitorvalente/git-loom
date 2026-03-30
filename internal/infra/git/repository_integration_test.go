@@ -32,36 +32,36 @@ func TestRepositoryWithRealGitRepository(t *testing.T) {
 		},
 	}
 
-	ok, err := repository.IsRepository()
-	if err != nil {
-		t.Fatalf("expected nil error, got %v", err)
+	ok, isRepoErr := repository.IsRepository()
+	if isRepoErr != nil {
+		t.Fatalf("expected nil error, got %v", isRepoErr)
 	}
 	if !ok {
 		t.Fatal("expected git repository to be detected")
 	}
 
-	if err := repository.StageFiles([]string{"file-a.txt", "file-b.txt"}); err != nil {
-		t.Fatalf("expected nil error, got %v", err)
+	if stageErr := repository.StageFiles([]string{"file-a.txt", "file-b.txt"}); stageErr != nil {
+		t.Fatalf("expected nil error, got %v", stageErr)
 	}
 
-	stagedFiles, err := repository.ListStagedFiles()
-	if err != nil {
-		t.Fatalf("expected nil error, got %v", err)
+	stagedFiles, listErr := repository.ListStagedFiles()
+	if listErr != nil {
+		t.Fatalf("expected nil error, got %v", listErr)
 	}
 	if !equalStringSlices(stagedFiles, []string{"file-a.txt", "file-b.txt"}) {
 		t.Fatalf("unexpected staged files: %v", stagedFiles)
 	}
 
-	diff, err := repository.GetDiff("file-a.txt")
-	if err != nil {
-		t.Fatalf("expected nil error, got %v", err)
+	diff, getDiffErr := repository.GetDiff("file-a.txt")
+	if getDiffErr != nil {
+		t.Fatalf("expected nil error, got %v", getDiffErr)
 	}
 	if !strings.Contains(diff, "diff --git a/file-a.txt b/file-a.txt") {
 		t.Fatalf("unexpected diff: %q", diff)
 	}
 
-	if err := repository.CommitPaths("feat(core): atualizar file a", []string{"file-a.txt"}); err != nil {
-		t.Fatalf("expected nil error, got %v", err)
+	if commitErr := repository.CommitPaths("feat(core): atualizar file a", []string{"file-a.txt"}); commitErr != nil {
+		t.Fatalf("expected nil error, got %v", commitErr)
 	}
 
 	headMessage := strings.TrimSpace(runGitCommand(t, repositoryPath, "log", "-1", "--pretty=%s"))
@@ -69,9 +69,9 @@ func TestRepositoryWithRealGitRepository(t *testing.T) {
 		t.Fatalf("unexpected head message: %q", headMessage)
 	}
 
-	remainingStagedFiles, err := repository.ListStagedFiles()
-	if err != nil {
-		t.Fatalf("expected nil error, got %v", err)
+	remainingStagedFiles, remainingListErr := repository.ListStagedFiles()
+	if remainingListErr != nil {
+		t.Fatalf("expected nil error, got %v", remainingListErr)
 	}
 	if !equalStringSlices(remainingStagedFiles, []string{"file-b.txt"}) {
 		t.Fatalf("unexpected remaining staged files: %v", remainingStagedFiles)

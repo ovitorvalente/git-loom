@@ -60,11 +60,11 @@ func TestNewAppModelResult(t *testing.T) {
 	plans := []app.CommitPlan{
 		{
 			Result: app.CommitResult{
-				Message: "feat(cli): adicionar comando",
+				Message: "feat(cli): adicionar commando",
 				Commit: domaincommit.Model{
 					Type:        domaincommit.TypeFeat,
 					Scope:       "cli",
-					Description: "adicionar comando",
+					Description: "adicionar commando",
 				},
 				Paths: []string{"internal/cli/commit.go"},
 			},

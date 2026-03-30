@@ -64,7 +64,7 @@ func TestScoreCommit(t *testing.T) {
 	quality := ScoreCommit(ChangeIntent{
 		Type:        "chore",
 		Scope:       "deps",
-		Description: "atualizar dependencias do projeto",
+		Description: "atualizar dependencias do projeto", //nolint:misspell
 	}, context)
 
 	if quality.Score <= 70 {
