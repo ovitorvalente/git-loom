@@ -55,11 +55,11 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Golangci-lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: latest
-          install-mode: module
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+      - name: Run golangci-lint
+        run: golangci-lint run
 
   build:
     runs-on: ubuntu-latest
