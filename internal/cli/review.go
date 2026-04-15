@@ -18,6 +18,9 @@ type reviewOptions struct {
 	verbose  bool
 	json     bool
 	optimize bool
+	explain  bool
+	focus    string
+	maxFiles int
 }
 
 type reviewExecution struct {
@@ -76,10 +79,15 @@ type jsonSkippedCommit struct {
 }
 
 func executeReview(command *cobra.Command, dependencies commitDependencies, options reviewOptions) (reviewExecution, error) {
+	if options.maxFiles <= 0 {
+		return reviewExecution{}, fmt.Errorf("--max-files-per-commit deve ser maior que zero")
+	}
+
 	service := app.NewCommitService(dependencies.gitRepository, dependencies.aiProvider)
 	renderer := ui.NewRenderer(ui.RenderOptions{
 		Mode:        renderModeFromReview(options),
 		ShowPreview: options.preview,
+		ShowExplain: options.explain,
 	})
 
 	selectedPaths, err := prepareCommitPaths(command, dependencies, commitOptions{
@@ -92,9 +100,14 @@ func executeReview(command *cobra.Command, dependencies commitDependencies, opti
 	if err != nil {
 		return reviewExecution{}, err
 	}
+	selectedPaths = filterPathsByFocus(selectedPaths, options.focus)
+	if len(selectedPaths) == 0 {
+		return reviewExecution{}, app.ErrEmptyDiff
+	}
 
 	review, err := service.PlanCommits(selectedPaths, app.GenerateCommitOptions{
-		Scope: dependencies.config.DefaultScope,
+		Scope:             dependencies.config.DefaultScope,
+		MaxFilesPerCommit: options.maxFiles,
 	})
 	if err != nil {
 		return reviewExecution{}, err
@@ -102,7 +115,8 @@ func executeReview(command *cobra.Command, dependencies commitDependencies, opti
 
 	if options.optimize {
 		review, err = service.ApplySuggestions(review, app.GenerateCommitOptions{
-			Scope: dependencies.config.DefaultScope,
+			Scope:             dependencies.config.DefaultScope,
+			MaxFilesPerCommit: options.maxFiles,
 		})
 		if err != nil {
 			return reviewExecution{}, err
@@ -110,7 +124,7 @@ func executeReview(command *cobra.Command, dependencies commitDependencies, opti
 	}
 
 	if options.strict {
-		if err := validateStrictReview(review); err != nil {
+		if err := validateStrictReview(review, options.maxFiles); err != nil {
 			return reviewExecution{}, err
 		}
 	}
@@ -234,7 +248,26 @@ func addReviewFlags(command *cobra.Command, options *reviewOptions, includeOptim
 	command.Flags().BoolVar(&options.strict, "strict", false, shared.MessageStrictFlag)
 	command.Flags().BoolVar(&options.verbose, "verbose", false, shared.MessageVerboseFlag)
 	command.Flags().BoolVar(&options.json, "json", false, shared.MessageJSONFlag)
+	command.Flags().BoolVar(&options.explain, "explain", false, "explica as razoes de agrupamento e score de cada commit planejado")
+	command.Flags().StringVar(&options.focus, "focus", "", "filtra o planejamento para caminhos/areas que contenham o termo informado")
+	command.Flags().IntVar(&options.maxFiles, "max-files-per-commit", 4, "define limite maximo de arquivos por commit planejado")
 	if includeOptimize {
 		command.Flags().BoolVar(&options.optimize, "optimize", false, shared.MessageOptimizeFlag)
 	}
+}
+
+func filterPathsByFocus(paths []string, focus string) []string {
+	normalizedFocus := strings.ToLower(strings.TrimSpace(focus))
+	if normalizedFocus == "" {
+		return append([]string(nil), paths...)
+	}
+
+	filteredPaths := make([]string, 0, len(paths))
+	for _, path := range paths {
+		if strings.Contains(strings.ToLower(path), normalizedFocus) {
+			filteredPaths = append(filteredPaths, path)
+		}
+	}
+
+	return filteredPaths
 }

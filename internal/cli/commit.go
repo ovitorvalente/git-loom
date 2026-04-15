@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -24,9 +25,11 @@ type commitDependencies struct {
 }
 
 type commitOptions struct {
-	dryRun bool
-	yes    bool
-	review reviewOptions
+	dryRun   bool
+	yes      bool
+	apply    string
+	editPlan bool
+	review   reviewOptions
 }
 
 type commitConfig struct {
@@ -68,6 +71,8 @@ func newCommitCommandWithDependencies(dependencies commitDependencies) *cobra.Co
 
 	command.Flags().BoolVar(&options.dryRun, "dry-run", false, shared.MessageDryRunFlag)
 	command.Flags().BoolVar(&options.yes, "yes", false, shared.MessageYesFlag)
+	command.Flags().StringVar(&options.apply, "apply", "", "aplica apenas os blocos informados (ex: 1,3-4)")
+	command.Flags().BoolVar(&options.editPlan, "edit-plan", false, "abre revisao interativa por bloco (enter/e/s/m/q) antes de confirmar")
 	addReviewFlags(command, &options.review, false)
 	return command
 }
@@ -87,7 +92,8 @@ func runCommitCommand(command *cobra.Command, dependencies commitDependencies, o
 
 	if shouldAutoApplySuggestions(options, dependencies.config, review.Suggestions) {
 		updatedReview, applyErr := service.ApplySuggestions(review, app.GenerateCommitOptions{
-			Scope: dependencies.config.DefaultScope,
+			Scope:             dependencies.config.DefaultScope,
+			MaxFilesPerCommit: options.review.maxFiles,
 		})
 		if applyErr != nil {
 			return applyErr
@@ -102,7 +108,8 @@ func runCommitCommand(command *cobra.Command, dependencies commitDependencies, o
 		}
 		if confirmed {
 			updatedReview, applyErr := service.ApplySuggestions(review, app.GenerateCommitOptions{
-				Scope: dependencies.config.DefaultScope,
+				Scope:             dependencies.config.DefaultScope,
+				MaxFilesPerCommit: options.review.maxFiles,
 			})
 			if applyErr != nil {
 				return applyErr
@@ -113,9 +120,14 @@ func runCommitCommand(command *cobra.Command, dependencies commitDependencies, o
 	}
 
 	if options.review.strict {
-		if strictErr := validateStrictReview(review); strictErr != nil {
+		if strictErr := validateStrictReview(review, options.review.maxFiles); strictErr != nil {
 			return strictErr
 		}
+	}
+
+	selected, parseErr := parseApplySelection(len(review.Plans), options.apply)
+	if parseErr != nil {
+		return parseErr
 	}
 
 	if !options.review.json || options.dryRun || options.review.preview {
@@ -128,8 +140,23 @@ func runCommitCommand(command *cobra.Command, dependencies commitDependencies, o
 		return nil
 	}
 
+	if options.editPlan && !options.review.json && !shouldSkipConfirmation(options, dependencies.config) && options.apply == "" {
+		editedReview, editedSelection, canceled, editErr := reviewPlanActions(command, service, review, options.review)
+		if editErr != nil {
+			return editErr
+		}
+		if canceled {
+			_, err := fmt.Fprintln(command.OutOrStdout(), shared.MessageCommitCanceled)
+			return err
+		}
+		review = editedReview
+		if len(editedSelection) > 0 {
+			selected = editedSelection
+		}
+	}
+
 	if shouldSkipConfirmation(options, dependencies.config) {
-		return createPlannedCommits(command, dependencies.gitRepository, renderer, review, options.review.json, true)
+		return createPlannedCommits(command, dependencies.gitRepository, renderer, review, options.review.json, true, selected)
 	}
 
 	confirmed, err := ui.ConfirmCommit(command.InOrStdin(), command.OutOrStdout(), shared.MessageCommitPlanQuestion)
@@ -141,7 +168,7 @@ func runCommitCommand(command *cobra.Command, dependencies commitDependencies, o
 		return err
 	}
 
-	return createPlannedCommits(command, dependencies.gitRepository, renderer, review, options.review.json, false)
+	return createPlannedCommits(command, dependencies.gitRepository, renderer, review, options.review.json, false, selected)
 }
 
 func shouldSkipConfirmation(options commitOptions, configuration commitConfig) bool {
@@ -164,7 +191,7 @@ func shouldAskToApplySuggestions(options commitOptions, configuration commitConf
 	return !shouldSkipConfirmation(options, configuration)
 }
 
-func createPlannedCommits(command *cobra.Command, gitRepository interfaces.GitRepository, renderer ui.Renderer, review app.CommitReview, asJSON bool, autoApprove bool) error {
+func createPlannedCommits(command *cobra.Command, gitRepository interfaces.GitRepository, renderer ui.Renderer, review app.CommitReview, asJSON bool, autoApprove bool, selected map[int]bool) error {
 	createdCommits := 0
 	totalScore := 0
 	created := []jsonCreatedCommit{}
@@ -176,6 +203,16 @@ func createPlannedCommits(command *cobra.Command, gitRepository interfaces.GitRe
 	}
 
 	for index, plan := range plans {
+		if len(selected) > 0 && !selected[index+1] {
+			if !asJSON {
+				if _, err := fmt.Fprintf(command.OutOrStdout(), shared.MessageIgnoredBlock+"\n", index+1); err != nil {
+					return err
+				}
+			}
+			skipped = append(skipped, jsonSkippedCommit{Index: index + 1})
+			continue
+		}
+
 		confirmed, err := confirmPlannedCommit(command, index+1, len(plans), autoApprove)
 		if err != nil {
 			return err
@@ -267,12 +304,16 @@ func printSuggestions(command *cobra.Command, renderer ui.Renderer, suggestions 
 	_, _ = fmt.Fprintf(command.OutOrStdout(), "%s\n", formattedSuggestions)
 }
 
-func validateStrictReview(review app.CommitReview) error {
+func validateStrictReview(review app.CommitReview, maxFilesPerCommit int) error {
+	if maxFilesPerCommit <= 0 {
+		maxFilesPerCommit = 4
+	}
+
 	for _, plan := range review.Plans {
 		if plan.Quality.Score < 80 {
 			return fmt.Errorf("%s: %s", shared.MessageStrictModeFailed, strings.TrimSpace(plan.Result.Message))
 		}
-		if len(plan.Result.Paths) > 4 {
+		if len(plan.Result.Paths) > maxFilesPerCommit {
 			return fmt.Errorf("%s: %s", shared.MessageStrictModeFailed, strings.TrimSpace(plan.Result.Message))
 		}
 	}
@@ -404,4 +445,105 @@ func uniquePaths(paths []string) []string {
 	}
 
 	return result
+}
+
+func parseApplySelection(total int, raw string) (map[int]bool, error) {
+	selection := map[int]bool{}
+	normalized := strings.TrimSpace(raw)
+	if normalized == "" {
+		return selection, nil
+	}
+
+	for _, part := range strings.Split(normalized, ",") {
+		token := strings.TrimSpace(part)
+		if token == "" {
+			continue
+		}
+
+		if strings.Contains(token, "-") {
+			rangeParts := strings.SplitN(token, "-", 2)
+			start, err := strconv.Atoi(strings.TrimSpace(rangeParts[0]))
+			if err != nil {
+				return nil, fmt.Errorf("--apply invalido: %q", token)
+			}
+			end, err := strconv.Atoi(strings.TrimSpace(rangeParts[1]))
+			if err != nil {
+				return nil, fmt.Errorf("--apply invalido: %q", token)
+			}
+			if start <= 0 || end <= 0 || start > end || end > total {
+				return nil, fmt.Errorf("--apply fora do intervalo: %q", token)
+			}
+			for index := start; index <= end; index++ {
+				selection[index] = true
+			}
+			continue
+		}
+
+		index, err := strconv.Atoi(token)
+		if err != nil {
+			return nil, fmt.Errorf("--apply invalido: %q", token)
+		}
+		if index <= 0 || index > total {
+			return nil, fmt.Errorf("--apply fora do intervalo: %q", token)
+		}
+		selection[index] = true
+	}
+
+	return selection, nil
+}
+
+func reviewPlanActions(command *cobra.Command, service app.CommitService, review app.CommitReview, options reviewOptions) (app.CommitReview, map[int]bool, bool, error) {
+	if len(review.Plans) == 0 {
+		return review, nil, false, nil
+	}
+
+	selected := map[int]bool{}
+	plans := append([]app.CommitPlan(nil), review.Plans...)
+	for index := 0; index < len(plans); index++ {
+		plan := plans[index]
+		action, err := ui.AskInput(command.InOrStdin(), command.OutOrStdout(), fmt.Sprintf("bloco %d/%d [enter=ok|e=editar|s=pular|m=mesclar|q=cancelar]", index+1, len(plans)))
+		if err != nil {
+			return review, nil, false, err
+		}
+
+		switch strings.ToLower(strings.TrimSpace(action)) {
+		case "", "ok", "y", "yes":
+			selected[index+1] = true
+		case "s", "skip":
+			continue
+		case "q", "cancel":
+			return review, nil, true, nil
+		case "e", "edit":
+			newMessage, askErr := ui.AskInput(command.InOrStdin(), command.OutOrStdout(), "nova mensagem do commit")
+			if askErr != nil {
+				return review, nil, false, askErr
+			}
+			if strings.TrimSpace(newMessage) != "" {
+				plan.Result.Message = strings.TrimSpace(newMessage)
+				plans[index] = plan
+			}
+			selected[index+1] = true
+		case "m", "merge":
+			if index+1 >= len(plans) {
+				return review, nil, false, fmt.Errorf("nao existe bloco seguinte para mesclar")
+			}
+			mergedPaths := append([]string(nil), plan.Result.Paths...)
+			mergedPaths = append(mergedPaths, plans[index+1].Result.Paths...)
+			mergedPlan, mergeErr := service.BuildPlanForPaths(mergedPaths, app.GenerateCommitOptions{
+				Scope:             plan.Result.Commit.Scope,
+				MaxFilesPerCommit: options.maxFiles,
+			})
+			if mergeErr != nil {
+				return review, nil, false, mergeErr
+			}
+			plans[index] = mergedPlan
+			plans = append(plans[:index+1], plans[index+2:]...)
+			selected[index+1] = true
+		default:
+			return review, nil, false, fmt.Errorf("acao invalida: %q", action)
+		}
+	}
+
+	review.Plans = plans
+	return review, selected, false, nil
 }

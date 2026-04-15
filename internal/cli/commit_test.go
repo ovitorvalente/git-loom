@@ -480,6 +480,126 @@ func TestCommitCommandRejectsPartiallyStagedFiles(t *testing.T) {
 	}
 }
 
+func TestParseApplySelection(t *testing.T) {
+	t.Parallel()
+
+	selection, err := parseApplySelection(5, "1,3-4")
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	for _, index := range []int{1, 3, 4} {
+		if !selection[index] {
+			t.Fatalf("expected index %d selected", index)
+		}
+	}
+	if selection[2] || selection[5] {
+		t.Fatalf("unexpected selection map: %#v", selection)
+	}
+}
+
+func TestParseApplySelectionRejectsOutOfRange(t *testing.T) {
+	t.Parallel()
+
+	_, err := parseApplySelection(2, "3")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "--apply fora do intervalo") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestCommitCommandApplySelectsSpecificBlocks(t *testing.T) {
+	t.Parallel()
+
+	output := &bytes.Buffer{}
+	paths := []string{
+		"internal/cli/a.go",
+		"internal/cli/b.go",
+		"internal/cli/c.go",
+		"internal/cli/d.go",
+		"internal/cli/e.go",
+		"internal/cli/f.go",
+	}
+	gitRepository := &mocks.GitRepository{
+		ListChangedFilesFunc: func() ([]string, error) {
+			return nil, nil
+		},
+		ListStagedFilesFunc: func() ([]string, error) {
+			return paths, nil
+		},
+		GetDiffFunc: func(requestedPaths ...string) (string, error) {
+			lines := []string{}
+			for _, path := range requestedPaths {
+				lines = append(lines, "diff --git a/"+path+" b/"+path, "index 1111111..2222222 100644")
+			}
+			return strings.Join(lines, "\n"), nil
+		},
+	}
+
+	command := newCommitCommandWithDependencies(commitDependencies{
+		gitRepository: gitRepository,
+		aiProvider:    &mocks.AIProvider{},
+	})
+	command.SetOut(output)
+	command.SetErr(output)
+	command.SetArgs([]string{"--yes", "--apply", "2"})
+
+	err := command.Execute()
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if len(gitRepository.CommitPathsCalls) != 1 {
+		t.Fatalf("expected one commit call, got %d", len(gitRepository.CommitPathsCalls))
+	}
+}
+
+func TestCommitCommandRespectsMaxFilesPerCommit(t *testing.T) {
+	t.Parallel()
+
+	output := &bytes.Buffer{}
+	paths := []string{
+		"internal/cli/a.go",
+		"internal/cli/b.go",
+		"internal/cli/c.go",
+		"internal/cli/d.go",
+		"internal/cli/e.go",
+	}
+	gitRepository := &mocks.GitRepository{
+		ListChangedFilesFunc: func() ([]string, error) {
+			return nil, nil
+		},
+		ListStagedFilesFunc: func() ([]string, error) {
+			return paths, nil
+		},
+		GetDiffFunc: func(requestedPaths ...string) (string, error) {
+			lines := []string{}
+			for _, path := range requestedPaths {
+				lines = append(lines, "diff --git a/"+path+" b/"+path, "index 1111111..2222222 100644")
+			}
+			return strings.Join(lines, "\n"), nil
+		},
+	}
+
+	command := newCommitCommandWithDependencies(commitDependencies{
+		gitRepository: gitRepository,
+		aiProvider:    &mocks.AIProvider{},
+	})
+	command.SetOut(output)
+	command.SetErr(output)
+	command.SetArgs([]string{"--yes", "--max-files-per-commit", "2"})
+
+	err := command.Execute()
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	for _, call := range gitRepository.CommitPathsCalls {
+		if len(call.Paths) > 2 {
+			t.Fatalf("expected chunk with at most 2 files, got %#v", call.Paths)
+		}
+	}
+}
+
 func TestRootCommandRegistersCommit(t *testing.T) {
 	t.Parallel()
 
