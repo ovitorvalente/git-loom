@@ -10,7 +10,6 @@ import (
 	"github.com/ovitorvalente/git-loom/internal/app"
 	"github.com/ovitorvalente/git-loom/internal/shared"
 	"github.com/ovitorvalente/git-loom/internal/ui"
-	"github.com/ovitorvalente/git-loom/internal/ui/tui"
 )
 
 type reviewOptions struct {
@@ -94,21 +93,9 @@ func executeReview(command *cobra.Command, dependencies commitDependencies, opti
 		return reviewExecution{}, err
 	}
 
-	var review app.CommitReview
-
-	if !options.json {
-		err = tui.RunWithSpinner("analisando mudancas...", func() error {
-			var planErr error
-			review, planErr = service.PlanCommits(selectedPaths, app.GenerateCommitOptions{
-				Scope: dependencies.config.DefaultScope,
-			})
-			return planErr
-		})
-	} else {
-		review, err = service.PlanCommits(selectedPaths, app.GenerateCommitOptions{
-			Scope: dependencies.config.DefaultScope,
-		})
-	}
+	review, err := service.PlanCommits(selectedPaths, app.GenerateCommitOptions{
+		Scope: dependencies.config.DefaultScope,
+	})
 	if err != nil {
 		return reviewExecution{}, err
 	}

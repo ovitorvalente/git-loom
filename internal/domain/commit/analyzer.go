@@ -2,6 +2,7 @@ package commit
 
 import (
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 )
@@ -17,11 +18,25 @@ type Change struct {
 	Status string
 }
 
+type diffInsights struct {
+	Commands  []string
+	Flags     []string
+	Functions []string
+	Topic     string
+}
+
+var (
+	flagPattern      = regexp.MustCompile(`--[a-z0-9][a-z0-9-]*`)
+	cobraFlagPattern = regexp.MustCompile(`(?:BoolVar|StringVar|IntVar|DurationVar)\([^,]+,\s*"([^"]+)"`)
+	commandPattern   = regexp.MustCompile(`Use:\s*"([^"]+)"`)
+)
+
 func AnalyzeDiff(diff string, commitType Type) Analysis {
 	changes := extractChanges(diff)
+	insights := extractDiffInsights(diff)
 	scope := detectScope(changes)
-	description := buildStructuredDescription(commitType, scope, changes)
-	body := buildStructuredBody(changes)
+	description := buildStructuredDescription(commitType, scope, changes, insights)
+	body := buildStructuredBody(changes, insights)
 
 	return Analysis{
 		Scope:       scope,
@@ -152,8 +167,11 @@ func mostCommonScope(scopeVotes map[string]int) string {
 	return selectedScope
 }
 
-func buildStructuredDescription(commitType Type, scope string, changes []Change) string {
+func buildStructuredDescription(commitType Type, scope string, changes []Change, insights diffInsights) string {
 	target := detectTarget(commitType, scope, changes)
+	if insightTarget := detectInsightTarget(scope, insights); insightTarget != "" {
+		target = insightTarget
+	}
 	action := detectAction(commitType, changes)
 
 	if commitType == TypeTest && strings.HasPrefix(target, "testes de ") {
@@ -331,7 +349,7 @@ func normalizeName(name string) string {
 	return strings.TrimSpace(normalizedName)
 }
 
-func buildStructuredBody(changes []Change) string {
+func buildStructuredBody(changes []Change, insights diffInsights) string {
 	if len(changes) == 0 {
 		return ""
 	}
@@ -341,7 +359,181 @@ func buildStructuredBody(changes []Change) string {
 		details = append(details, "- "+describeChange(change))
 	}
 
+	if len(insights.Functions) > 0 {
+		details = append(details, "- ajusta funcoes: "+strings.Join(limitItems(insights.Functions, 3), ", "))
+	}
+	if len(insights.Flags) > 0 {
+		details = append(details, "- ajusta flags: "+strings.Join(limitItems(insights.Flags, 4), ", "))
+	}
+	if len(insights.Commands) > 0 {
+		details = append(details, "- ajusta comandos: "+strings.Join(limitItems(insights.Commands, 3), ", "))
+	}
+
 	return strings.Join(details, "\n")
+}
+
+func extractDiffInsights(diff string) diffInsights {
+	lines := strings.Split(diff, "\n")
+	functions := map[string]bool{}
+	flags := map[string]bool{}
+	commands := map[string]bool{}
+	topicVotes := map[string]int{}
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+
+		if strings.HasPrefix(trimmed, "+") && !strings.HasPrefix(trimmed, "+++") {
+			addedLine := strings.TrimSpace(strings.TrimPrefix(trimmed, "+"))
+			if function := extractFunctionName(addedLine); function != "" {
+				functions[function] = true
+			}
+			for _, match := range flagPattern.FindAllString(addedLine, -1) {
+				flags[match] = true
+			}
+			if cobraFlag := extractCobraFlagName(addedLine); cobraFlag != "" {
+				flags[cobraFlag] = true
+			}
+			if command := extractCommandName(addedLine); command != "" {
+				commands[command] = true
+			}
+			collectTopicVotes(strings.ToLower(addedLine), topicVotes)
+		}
+	}
+
+	return diffInsights{
+		Functions: mapKeysSorted(functions),
+		Flags:     mapKeysSorted(flags),
+		Commands:  mapKeysSorted(commands),
+		Topic:     dominantTopic(topicVotes),
+	}
+}
+
+func extractFunctionName(line string) string {
+	if !strings.HasPrefix(line, "func ") {
+		return ""
+	}
+
+	withoutPrefix := strings.TrimPrefix(line, "func ")
+	if strings.HasPrefix(withoutPrefix, "(") {
+		receiverEnd := strings.Index(withoutPrefix, ")")
+		if receiverEnd < 0 || receiverEnd+1 >= len(withoutPrefix) {
+			return ""
+		}
+		withoutPrefix = strings.TrimSpace(withoutPrefix[receiverEnd+1:])
+	}
+
+	nameEnd := strings.Index(withoutPrefix, "(")
+	if nameEnd <= 0 {
+		return ""
+	}
+
+	return strings.TrimSpace(withoutPrefix[:nameEnd])
+}
+
+func extractCommandName(line string) string {
+	matches := commandPattern.FindStringSubmatch(line)
+	if len(matches) < 2 {
+		return ""
+	}
+
+	command := strings.TrimSpace(matches[1])
+	if command == "" {
+		return ""
+	}
+
+	fields := strings.Fields(command)
+	if len(fields) == 0 {
+		return ""
+	}
+
+	return fields[0]
+}
+
+func extractCobraFlagName(line string) string {
+	matches := cobraFlagPattern.FindStringSubmatch(line)
+	if len(matches) < 2 {
+		return ""
+	}
+
+	flag := strings.TrimSpace(matches[1])
+	if flag == "" {
+		return ""
+	}
+
+	return "--" + flag
+}
+
+func collectTopicVotes(line string, votes map[string]int) {
+	switch {
+	case containsAny(line, "json", "marshal", "unmarshal"):
+		votes["saida json"]++
+	case containsAny(line, "prompt", "confirm", "[y/n]", "stdin", "stdout"):
+		votes["confirmacao do fluxo"]++
+	case containsAny(line, "strict"):
+		votes["modo estrito"]++
+	case containsAny(line, "preview", "diff impact"):
+		votes["preview de mudancas"]++
+	case containsAny(line, "optimize", "suggestion", "sugest"):
+		votes["sugestoes de agrupamento"]++
+	case containsAny(line, "config", "yaml", "loader", "schema"):
+		votes["configuracao"]++
+	case containsAny(line, "doctor", "check", "diagnostic"):
+		votes["diagnostico"]++
+	case containsAny(line, "commit", "stage", "staged"):
+		votes["fluxo de commit"]++
+	case containsAny(line, "analyze", "review", "plan"):
+		votes["analise de commits"]++
+	}
+}
+
+func dominantTopic(votes map[string]int) string {
+	bestTopic := ""
+	bestVotes := 0
+	for topic, value := range votes {
+		if value > bestVotes || (value == bestVotes && topic < bestTopic) {
+			bestTopic = topic
+			bestVotes = value
+		}
+	}
+
+	return bestTopic
+}
+
+func detectInsightTarget(scope string, insights diffInsights) string {
+	if insights.Topic == "" {
+		return ""
+	}
+	if scope == "" {
+		return insights.Topic
+	}
+	if scope == "cli" {
+		return insights.Topic + " do cli"
+	}
+
+	return insights.Topic + " em " + scope
+}
+
+func mapKeysSorted(values map[string]bool) []string {
+	if len(values) == 0 {
+		return nil
+	}
+
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func limitItems(values []string, limit int) []string {
+	if len(values) <= limit {
+		return values
+	}
+	return values[:limit]
 }
 
 func describeChange(change Change) string {
