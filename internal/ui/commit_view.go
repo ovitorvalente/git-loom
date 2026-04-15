@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/ovitorvalente/git-loom/internal/app"
@@ -37,6 +38,20 @@ func (renderer Renderer) CommitPlan(index int, total int, plan app.CommitPlan) s
 	analysisBlock := renderer.renderAnalysis(feedback.Highlights)
 	if analysisBlock != "" {
 		lines = append(lines, renderer.sectionTitle("analise"), analysisBlock)
+	}
+	if renderer.withExplain() {
+		explainBlock := renderer.renderExplain(plan)
+		if explainBlock != "" {
+			if analysisBlock != "" {
+				lines = append(lines, "")
+			}
+			lines = append(lines, renderer.sectionTitle("porque esse agrupamento"), explainBlock)
+		}
+
+		diagnosticBlock := renderer.renderScoreDiagnostics(plan.Quality.Criteria)
+		if diagnosticBlock != "" {
+			lines = append(lines, "", renderer.sectionTitle("diagnostico de score"), diagnosticBlock)
+		}
 	}
 
 	suggestionsBlock := renderer.renderSuggestionsList(feedback.Suggestions)
@@ -209,6 +224,101 @@ func (renderer Renderer) renderPreview(preview app.CommitPreview) string {
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+func (renderer Renderer) renderExplain(plan app.CommitPlan) string {
+	area := dominantPlanningArea(plan.Result.Paths)
+	commitType := strings.TrimSpace(string(plan.Result.Commit.Type))
+	scope := strings.TrimSpace(plan.Result.Commit.Scope)
+	group := strings.TrimSpace(plan.SemanticGroup)
+
+	lines := []string{}
+	if area != "" {
+		lines = append(lines, colorizeLine(defaultColor, "  area dominante: "+area))
+	}
+	if commitType != "" {
+		lines = append(lines, colorizeLine(defaultColor, "  tipo predominante: "+commitType))
+	}
+	if scope != "" {
+		lines = append(lines, colorizeLine(defaultColor, "  escopo detectado: "+scope))
+	}
+	if group != "" {
+		lines = append(lines, colorizeLine(defaultColor, "  chave semantica: "+group))
+	}
+	if len(plan.Result.Paths) > 0 {
+		lines = append(lines, colorizeLine(defaultColor, fmt.Sprintf("  total de arquivos: %d", len(plan.Result.Paths))))
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func (renderer Renderer) renderScoreDiagnostics(criteria []semantic.QualityCriteria) string {
+	if len(criteria) == 0 {
+		return ""
+	}
+
+	lines := []string{}
+	for _, criterion := range criteria {
+		if criterion.Passed {
+			continue
+		}
+		message := strings.TrimSpace(criterion.Name)
+		if strings.TrimSpace(criterion.Message) != "" {
+			message = strings.TrimSpace(criterion.Message)
+		}
+
+		if criterion.Warning {
+			lines = append(lines, colorizeLine(warningColor, "  - alerta: "+message))
+			continue
+		}
+		lines = append(lines, colorizeLine(dangerColor, "  - falha: "+message))
+	}
+
+	if len(lines) == 0 {
+		lines = append(lines, colorizeLine(successColor, "  - score sem alertas"))
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func dominantPlanningArea(paths []string) string {
+	if len(paths) == 0 {
+		return ""
+	}
+
+	votes := map[string]int{}
+	for _, path := range paths {
+		area := planningAreaForPath(path)
+		if area == "" {
+			continue
+		}
+		votes[area]++
+	}
+
+	selected := ""
+	selectedVotes := 0
+	for area, count := range votes {
+		if count > selectedVotes || (count == selectedVotes && area < selected) {
+			selected = area
+			selectedVotes = count
+		}
+	}
+
+	return selected
+}
+
+func planningAreaForPath(path string) string {
+	directory := filepath.Dir(strings.TrimSpace(path))
+	if directory == "." || directory == "" {
+		return "root"
+	}
+
+	segments := strings.Split(directory, "/")
+	if len(segments) >= 2 {
+		return segments[0] + "/" + segments[1]
+	}
+
+	return segments[0]
 }
 
 func (renderer Renderer) renderFileLine(file semantic.ChangedFile) string {

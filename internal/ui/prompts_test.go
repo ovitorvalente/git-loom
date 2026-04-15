@@ -62,3 +62,19 @@ func TestConfirmCommit(t *testing.T) {
 		})
 	}
 }
+
+func TestAskInput(t *testing.T) {
+	t.Parallel()
+
+	output := &bytes.Buffer{}
+	answer, err := AskInput(strings.NewReader("nova mensagem\n"), output, "editar mensagem")
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if answer != "nova mensagem" {
+		t.Fatalf("expected trimmed answer, got %q", answer)
+	}
+	if !strings.Contains(output.String(), "editar mensagem") {
+		t.Fatalf("expected prompt output, got %q", output.String())
+	}
+}

@@ -26,3 +26,20 @@ func ConfirmCommit(input io.Reader, output io.Writer, question string) (bool, er
 	normalizedAnswer := strings.ToLower(strings.TrimSpace(answer))
 	return normalizedAnswer == "" || normalizedAnswer == "y" || normalizedAnswer == "yes", nil
 }
+
+func AskInput(input io.Reader, output io.Writer, question string) (string, error) {
+	promptPrefix := colorizeText(statusPromptColor, ">")
+	highlightedQuestion := colorizeText(defaultColor, question)
+	suffix := colorizeText(emphasisColor, ": ")
+	if _, err := fmt.Fprintf(output, "\n%s %s%s", promptPrefix, highlightedQuestion, suffix); err != nil {
+		return "", err
+	}
+
+	reader := bufio.NewReader(input)
+	answer, err := reader.ReadString('\n')
+	if err != nil && err != io.EOF {
+		return "", err
+	}
+
+	return strings.TrimSpace(answer), nil
+}
