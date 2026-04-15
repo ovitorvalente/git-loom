@@ -293,6 +293,25 @@ func isDependencyPath(path string) bool {
 	}
 }
 
+func planningArea(path string) string {
+	trimmed := strings.TrimSpace(path)
+	if trimmed == "" {
+		return ""
+	}
+
+	directory := filepath.Dir(trimmed)
+	if directory == "." || directory == "" {
+		return "root"
+	}
+
+	segments := strings.Split(directory, "/")
+	if len(segments) >= 2 {
+		return segments[0] + "/" + segments[1]
+	}
+
+	return segments[0]
+}
+
 func chunkPaths(paths []string, chunkSize int) [][]string {
 	if len(paths) == 0 {
 		return nil
@@ -302,12 +321,29 @@ func chunkPaths(paths []string, chunkSize int) [][]string {
 	}
 
 	chunks := [][]string{}
-	for start := 0; start < len(paths); start += chunkSize {
-		end := start + chunkSize
-		if end > len(paths) {
-			end = len(paths)
+	current := []string{}
+	for _, path := range paths {
+		if len(current) == 0 {
+			current = append(current, path)
+			continue
 		}
-		chunks = append(chunks, append([]string(nil), paths[start:end]...))
+
+		// Keep chunks cohesive: avoid forcing a mixed-area 4th file when a 3-file
+		// chunk is already coherent.
+		if len(current) >= chunkSize-1 && planningArea(current[0]) != planningArea(path) {
+			chunks = append(chunks, append([]string(nil), current...))
+			current = []string{path}
+			continue
+		}
+
+		current = append(current, path)
+		if len(current) == chunkSize {
+			chunks = append(chunks, append([]string(nil), current...))
+			current = current[:0]
+		}
+	}
+	if len(current) > 0 {
+		chunks = append(chunks, append([]string(nil), current...))
 	}
 
 	chunks = rebalanceSingleFileTail(chunks)
@@ -327,12 +363,23 @@ func rebalanceSingleFileTail(chunks [][]string) [][]string {
 	if len(chunks[previousIndex]) <= 2 {
 		return chunks
 	}
+	if !samePlanningArea(chunks[previousIndex], chunks[lastIndex]) {
+		return chunks
+	}
 
 	moved := chunks[previousIndex][len(chunks[previousIndex])-1]
 	chunks[previousIndex] = chunks[previousIndex][:len(chunks[previousIndex])-1]
 	chunks[lastIndex] = append([]string{moved}, chunks[lastIndex]...)
 
 	return chunks
+}
+
+func samePlanningArea(left []string, right []string) bool {
+	if len(left) == 0 || len(right) == 0 {
+		return false
+	}
+
+	return planningArea(left[0]) == planningArea(right[0])
 }
 
 func buildSuggestions(plans []CommitPlan) []CommitSuggestion {

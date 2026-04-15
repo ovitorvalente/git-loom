@@ -214,6 +214,47 @@ func TestChunkPathsRebalancesMultipleTails(t *testing.T) {
 	}
 }
 
+func TestChunkPathsKeepsAreaCohesionWhenCrossingBoundary(t *testing.T) {
+	t.Parallel()
+
+	chunks := chunkPaths([]string{
+		"internal/app/a.go",
+		"internal/app/b.go",
+		"internal/app/c.go",
+		"internal/cli/d.go",
+		"internal/cli/e.go",
+	}, 4)
+
+	if len(chunks) != 2 {
+		t.Fatalf("expected two chunks, got %d", len(chunks))
+	}
+	if len(chunks[0]) != 3 {
+		t.Fatalf("expected first chunk with three files, got %d", len(chunks[0]))
+	}
+	if len(chunks[1]) != 2 {
+		t.Fatalf("expected second chunk with two files, got %d", len(chunks[1]))
+	}
+	if chunks[0][2] != "internal/app/c.go" {
+		t.Fatalf("expected cohesive app chunk, got %#v", chunks[0])
+	}
+}
+
+func TestChunkPathsDoesNotRebalanceSingleTailAcrossAreas(t *testing.T) {
+	t.Parallel()
+
+	chunks := rebalanceSingleFileTail([][]string{
+		{"internal/app/a.go", "internal/app/b.go", "internal/app/c.go", "internal/app/d.go"},
+		{"internal/ui/e.go"},
+	})
+
+	if len(chunks[0]) != 4 {
+		t.Fatalf("expected first chunk to stay with four files, got %d", len(chunks[0]))
+	}
+	if len(chunks[1]) != 1 {
+		t.Fatalf("expected tail to stay single file, got %d", len(chunks[1]))
+	}
+}
+
 func TestCommitServicePlanCommitsMergesSupportFilesIntoPrimaryArea(t *testing.T) {
 	t.Parallel()
 
@@ -300,8 +341,8 @@ func TestCommitServicePlanCommitsSeparatesDependencyFilesFromCode(t *testing.T) 
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
-	if len(review.Plans) != 2 {
-		t.Fatalf("expected two plans, got %d", len(review.Plans))
+	if len(review.Plans) != 3 {
+		t.Fatalf("expected three plans, got %d", len(review.Plans))
 	}
 	if len(review.Plans[0].Result.Paths) != 2 {
 		t.Fatalf("expected dependency plan with two files, got %d", len(review.Plans[0].Result.Paths))
@@ -309,7 +350,10 @@ func TestCommitServicePlanCommitsSeparatesDependencyFilesFromCode(t *testing.T) 
 	if review.Plans[0].Result.Paths[0] != "go.mod" || review.Plans[0].Result.Paths[1] != "go.sum" {
 		t.Fatalf("expected dependency files in first plan, got %#v", review.Plans[0].Result.Paths)
 	}
-	if len(review.Plans[1].Result.Paths) != 4 {
-		t.Fatalf("expected code plan with four files, got %d", len(review.Plans[1].Result.Paths))
+	if len(review.Plans[1].Result.Paths) != 3 {
+		t.Fatalf("expected first code plan with three files, got %d", len(review.Plans[1].Result.Paths))
+	}
+	if len(review.Plans[2].Result.Paths) != 1 {
+		t.Fatalf("expected second code plan with one file, got %d", len(review.Plans[2].Result.Paths))
 	}
 }
