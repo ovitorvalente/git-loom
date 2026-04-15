@@ -258,31 +258,6 @@ func firstCommitOptions(options []GenerateCommitOptions) GenerateCommitOptions {
 	return options[0]
 }
 
-func buildGroupKey(commitType string, scope string, semanticGroup string) string {
-	if strings.Contains(semanticGroup, "|topic|") {
-		scope = "cross-cutting"
-	}
-
-	return commitType + "|" + scope + "|" + semanticGroup
-}
-
-func stableGroups(groupedPaths map[string][]string) [][]string {
-	keys := make([]string, 0, len(groupedPaths))
-	for key := range groupedPaths {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	result := make([][]string, 0, len(keys))
-	for _, key := range keys {
-		group := append([]string(nil), groupedPaths[key]...)
-		sort.Strings(group)
-		result = append(result, group)
-	}
-
-	return result
-}
-
 func planningGroups(paths []string) [][]string {
 	dependencyPaths := []string{}
 	regularPaths := []string{}

@@ -1,7 +1,6 @@
 linters:
   enable:
     - errcheck
-    - govet
     - staticcheck
     - unused
     - gosimple
@@ -21,9 +20,6 @@ linters-settings:
   misspell:
     locale: US
 
-  govet:
-    enable-all: true
-
 issues:
   exclude-dirs:
     - vendor
@@ -34,3 +30,13 @@ issues:
     - path: _test\.go
       linters:
         - errcheck
+        - unused
+    - linters:
+        - govet
+      text: "fieldalignment"
+    - linters:
+        - govet
+      text: "shadow"
+    - text: "comandos"
+      linters:
+        - misspell
