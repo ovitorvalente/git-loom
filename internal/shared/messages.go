@@ -43,6 +43,7 @@ const (
 	MessageConfigShort          = "Gerencia a configuracao do gitloom"
 	MessageConfigInitShort      = "Cria um arquivo .gitloom.yaml inicial"
 	MessageDoctorShort          = "Valida se o repositorio e o ambiente estao prontos para o gitloom"
+	MessageUpdateShort          = "Atualiza o gitloom para a versao mais recente"
 	MessageConfigExists         = ".gitloom.yaml ja existe; use --force para sobrescrever"
 	MessageConfigCreated        = "arquivo de configuracao criado: %s"
 )
