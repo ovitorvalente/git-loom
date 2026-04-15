@@ -357,3 +357,36 @@ func TestCommitServicePlanCommitsSeparatesDependencyFilesFromCode(t *testing.T) 
 		t.Fatalf("expected second code plan with one file, got %d", len(review.Plans[2].Result.Paths))
 	}
 }
+
+func TestCommitServicePlanCommitsRespectsMaxFilesPerCommitOption(t *testing.T) {
+	t.Parallel()
+
+	service := NewCommitService(&mocks.GitRepository{
+		GetDiffFunc: func(paths ...string) (string, error) {
+			lines := []string{}
+			for _, path := range paths {
+				lines = append(lines, "diff --git a/"+path+" b/"+path, "index 1111111..2222222 100644")
+			}
+			return strings.Join(lines, "\n"), nil
+		},
+	}, &mocks.AIProvider{})
+
+	review, err := service.PlanCommits([]string{
+		"internal/cli/a.go",
+		"internal/cli/b.go",
+		"internal/cli/c.go",
+		"internal/cli/d.go",
+		"internal/cli/e.go",
+	}, GenerateCommitOptions{MaxFilesPerCommit: 2})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if len(review.Plans) != 3 {
+		t.Fatalf("expected three plans, got %d", len(review.Plans))
+	}
+	for _, plan := range review.Plans {
+		if len(plan.Result.Paths) > 2 {
+			t.Fatalf("expected at most 2 files in plan, got %d", len(plan.Result.Paths))
+		}
+	}
+}

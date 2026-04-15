@@ -22,7 +22,8 @@ type CommitService struct {
 }
 
 type GenerateCommitOptions struct {
-	Scope string
+	Scope             string
+	MaxFilesPerCommit int
 }
 
 type CommitResult struct {
@@ -78,12 +79,33 @@ func (service CommitService) GenerateCommitForPaths(paths []string, options ...G
 	return service.generateFromDiff(diff, paths, firstCommitOptions(options))
 }
 
+func (service CommitService) BuildPlanForPaths(paths []string, options ...GenerateCommitOptions) (CommitPlan, error) {
+	result, err := service.GenerateCommitForPaths(paths, options...)
+	if err != nil {
+		return CommitPlan{}, err
+	}
+
+	context := semantic.NewCommitContext(result.Diff)
+	intent := semantic.DetectIntent(string(result.Commit.Type), context)
+	return CommitPlan{
+		Result:        result,
+		Preview:       semantic.BuildPreview(context),
+		Quality:       semantic.ScoreCommit(intent, context),
+		Context:       context,
+		SemanticGroup: semantic.BuildGroupingKey(string(result.Commit.Type), context),
+	}, nil
+}
+
 func (service CommitService) PlanCommits(paths []string, options ...GenerateCommitOptions) (CommitReview, error) {
 	commitOptions := firstCommitOptions(options)
+	chunkSize := commitOptions.MaxFilesPerCommit
+	if chunkSize <= 0 {
+		chunkSize = 4
+	}
 	plans := []CommitPlan{}
 	for _, group := range planningGroups(paths) {
 		groupPlans := []CommitPlan{}
-		for _, chunk := range chunkPaths(group, 4) {
+		for _, chunk := range chunkPaths(group, chunkSize) {
 			result, err := service.GenerateCommitForPaths(chunk, commitOptions)
 			if err != nil {
 				return CommitReview{}, err
@@ -120,12 +142,17 @@ func (service CommitService) PlanCommits(paths []string, options ...GenerateComm
 }
 
 func (service CommitService) ApplySuggestions(review CommitReview, options ...GenerateCommitOptions) (CommitReview, error) {
-	mergedPaths := mergeSuggestedPlans(review.Plans)
+	commitOptions := firstCommitOptions(options)
+	maxFilesPerCommit := commitOptions.MaxFilesPerCommit
+	if maxFilesPerCommit <= 0 {
+		maxFilesPerCommit = 4
+	}
+
+	mergedPaths := mergeSuggestedPlans(review.Plans, maxFilesPerCommit)
 	if len(mergedPaths) == 0 {
 		return review, nil
 	}
 
-	commitOptions := firstCommitOptions(options)
 	plans := make([]CommitPlan, 0, len(mergedPaths))
 	for _, group := range mergedPaths {
 		result, err := service.GenerateCommitForPaths(group, commitOptions)
@@ -393,7 +420,7 @@ func buildSuggestions(plans []CommitPlan) []CommitSuggestion {
 		}
 	}
 
-	reducedPlans := mergeSuggestedPlans(plans)
+	reducedPlans := mergeSuggestedPlans(plans, 4)
 	if len(reducedPlans) > 0 && len(reducedPlans) < len(plans) {
 		suggestions = append(suggestions, CommitSuggestion{
 			Message:        "reduzir commits de " + ordinal(len(plans)) + " para " + ordinal(len(reducedPlans)),
@@ -415,9 +442,12 @@ func buildSuggestions(plans []CommitPlan) []CommitSuggestion {
 	return deduplicateSuggestions(suggestions)
 }
 
-func mergeSuggestedPlans(plans []CommitPlan) [][]string {
+func mergeSuggestedPlans(plans []CommitPlan, maxFilesPerCommit int) [][]string {
 	if len(plans) == 0 {
 		return nil
+	}
+	if maxFilesPerCommit <= 0 {
+		maxFilesPerCommit = 4
 	}
 
 	mergedPaths := [][]string{}
@@ -426,7 +456,7 @@ func mergeSuggestedPlans(plans []CommitPlan) [][]string {
 
 	for index := 1; index < len(plans); index++ {
 		nextPlan := plans[index]
-		if canMergePlans(currentPlan, nextPlan) && len(currentGroup)+len(nextPlan.Result.Paths) <= 4 {
+		if canMergePlans(currentPlan, nextPlan) && len(currentGroup)+len(nextPlan.Result.Paths) <= maxFilesPerCommit {
 			currentGroup = append(currentGroup, nextPlan.Result.Paths...)
 			currentPlan = nextPlan
 			continue
@@ -456,6 +486,10 @@ func (service CommitService) optimizePlans(plans []CommitPlan, options GenerateC
 	if len(plans) < 2 {
 		return plans, nil
 	}
+	maxFilesPerCommit := options.MaxFilesPerCommit
+	if maxFilesPerCommit <= 0 {
+		maxFilesPerCommit = 4
+	}
 
 	groupedPaths := make([][]string, 0, len(plans))
 	groupAnchors := make([]CommitPlan, 0, len(plans))
@@ -468,13 +502,13 @@ func (service CommitService) optimizePlans(plans []CommitPlan, options GenerateC
 
 		lastIndex := len(groupedPaths) - 1
 		lastGroup := groupedPaths[lastIndex]
-		if shouldAttachSupportPlan(lastGroup, plan, groupAnchors[lastIndex]) {
+		if shouldAttachSupportPlan(lastGroup, plan, groupAnchors[lastIndex], maxFilesPerCommit) {
 			lastGroup = append(lastGroup, plan.Result.Paths...)
 			sort.Strings(lastGroup)
 			groupedPaths[lastIndex] = lastGroup
 			continue
 		}
-		if shouldAttachSupportPlan(append([]string(nil), plan.Result.Paths...), groupAnchors[lastIndex], plan) {
+		if shouldAttachSupportPlan(append([]string(nil), plan.Result.Paths...), groupAnchors[lastIndex], plan, maxFilesPerCommit) {
 			mergedGroup := append(append([]string(nil), plan.Result.Paths...), lastGroup...)
 			sort.Strings(mergedGroup)
 			groupedPaths[lastIndex] = mergedGroup
@@ -507,8 +541,8 @@ func (service CommitService) optimizePlans(plans []CommitPlan, options GenerateC
 	return optimized, nil
 }
 
-func shouldAttachSupportPlan(currentGroup []string, support CommitPlan, primary CommitPlan) bool {
-	if len(currentGroup)+len(support.Result.Paths) > 4 {
+func shouldAttachSupportPlan(currentGroup []string, support CommitPlan, primary CommitPlan, maxFilesPerCommit int) bool {
+	if len(currentGroup)+len(support.Result.Paths) > maxFilesPerCommit {
 		return false
 	}
 	if !isSupportPlan(support) {
