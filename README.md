@@ -1,8 +1,10 @@
 # Git Loom
 
-[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat-square)](https://golang.org)
+[![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat-square)](https://golang.org)
 [![Latest Release](https://img.shields.io/github/v/release/ovitorvalente/git-loom?style=flat-square)](https://github.com/ovitorvalente/git-loom/releases)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
+[![Test Status](https://img.shields.io/github/actions/workflow/status/ovitorvalente/git-loom/test?label=tests)](https://github.com/ovitorvalente/git-loom/actions)
+[![Go Report Card](https://goreportcard.com/badge/github.com/ovitorvalente/git-loom)](https://goreportcard.com/report/github.com/ovitorvalente/git-loom)
 
 `gitloom` e um CLI em Go para revisar, agrupar e criar commits semanticos com feedback acionavel antes da execucao.
 
@@ -14,29 +16,44 @@ Em vez de agir como um gerador cego de mensagem, o `gitloom` ajuda voce a decidi
 
 ```bash
 go install github.com/ovitorvalente/git-loom/cmd/gitloom@latest
+# ou via alias curto:
+go install github.com/ovitorvalente/git-loom/cmd/gitloom@latest -o gl
+
 git add .
-gitloom doctor
-gitloom analyze
-gitloom commit
+gl doctor
+gl analyze
+gl commit
 ```
 
-Se quiser automacao:
+Automacao:
 
 ```bash
-gitloom analyze --json
-gitloom commit --yes --json
+gl analyze --json
+gl commit --yes --json
 ```
+
+## Metricas do projeto
+
+- **67 arquivos Go**
+- **13 pacotes com testes**
+- **100% testes passando**
+- **Go 1.25+**
+- **1 dependencia externa** (Cobra)
+- **Clean Architecture**
 
 ## O que o projeto faz hoje
 
-- agrupa mudancas em blocos pequenos
+- agrupa mudancas em blocos pequenos (maxFiles configuravel)
 - gera mensagens em portugues seguindo Conventional Commits
-- calcula score de qualidade por commit planejado
+- calcula score de qualidade (0-100) por commit planejado
+- sistema de sugestoes inteligentes (detecta mensagens/escopos fracos)
+- preview do diff antes de criar commits
 - mostra alertas, detalhes e sugestoes antes de commitar
-- suporta revisao sem execucao com `analyze`
+- suporte revisao sem execucao com `analyze`
 - valida o estado do ambiente com `doctor`
-- expoe saida JSON para automacao
-- suporta configuracao local com `.gitloom.yaml`
+- expoe saida JSON para automacao (CI/scripts)
+- suporte configuracao local com `.gitloom.yaml`
+- alias curto: `gl` ou `loom`
 - gera binarios para Linux, macOS e Windows
 
 ## Comandos principais
@@ -82,8 +99,14 @@ gitloom doctor --json
 ```bash
 gitloom config init
 gitloom version
+gitloom update
+gitloom update --check
 gitloom help
 gitloom help commit
+# alias curtos tambem funcionam:
+gl version
+gl update
+gl help
 ```
 
 ## Filosofia do produto
@@ -145,7 +168,7 @@ go install github.com/ovitorvalente/git-loom/cmd/gitloom@latest
 
 ### Requisitos
 
-- Go 1.21+
+- Go 1.25+
 - Git instalado e disponivel no `PATH`
 - acesso a um repositorio Git local
 
@@ -274,9 +297,17 @@ make build
 
 O projeto possui:
 
-- testes unitarios por camada
+- testes unitarios por camada (domain, app, infra, cli, ui, semantic)
 - testes da CLI com mocks
 - testes de integracao do wrapper Git com repositório temporario real
+- mocks para GitRepository e AIProvider
+
+Executar:
+
+```bash
+make test
+make vet
+```
 
 ## Contribuicao
 
@@ -326,11 +357,13 @@ Se o problema for de planejamento de commits, tente anexar:
 
 Areas com maior potencial de contribuicao:
 
-- provider de IA configuravel
-- parser de configuracao mais robusto
-- suporte a instalacao por Homebrew e Winget
-- CI para `push` e `pull_request`
-- melhor agrupamento para monorepo
+- provider de IA configuravel (Ollama, OpenAI, Anthropic)
+- parser de configuracao mais robusto (schema validation)
+- suporte a instalacao por Homebrew, Winget, Cargo
+- CI para `push` e `pull_request` (lint, test, build)
+- melhor agrupamento para monorepo (scope detection por pasta)
+- suporte a hooks (pre-commit, post-commit)
+- plugin system
 
 ## GitHub repository metadata
 
