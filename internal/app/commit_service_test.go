@@ -167,14 +167,50 @@ func TestCommitServicePlanCommits(t *testing.T) {
 	if len(review.Plans) != 2 {
 		t.Fatalf("expected two plans, got %d", len(review.Plans))
 	}
-	if len(review.Plans[0].Result.Paths) != 4 {
-		t.Fatalf("expected first plan with four files, got %d", len(review.Plans[0].Result.Paths))
+	if len(review.Plans[0].Result.Paths) != 3 {
+		t.Fatalf("expected first plan with three files, got %d", len(review.Plans[0].Result.Paths))
 	}
-	if len(review.Plans[1].Result.Paths) != 1 {
-		t.Fatalf("expected second plan with one file, got %d", len(review.Plans[1].Result.Paths))
+	if len(review.Plans[1].Result.Paths) != 2 {
+		t.Fatalf("expected second plan with two files, got %d", len(review.Plans[1].Result.Paths))
 	}
 	if review.Plans[0].Quality.Score == 0 {
 		t.Fatal("expected quality score to be calculated")
+	}
+}
+
+func TestChunkPathsRebalancesSingleFileTail(t *testing.T) {
+	t.Parallel()
+
+	chunks := chunkPaths([]string{
+		"a.go", "b.go", "c.go", "d.go", "e.go",
+	}, 4)
+
+	if len(chunks) != 2 {
+		t.Fatalf("expected two chunks, got %d", len(chunks))
+	}
+	if len(chunks[0]) != 3 {
+		t.Fatalf("expected first chunk with three files, got %d", len(chunks[0]))
+	}
+	if len(chunks[1]) != 2 {
+		t.Fatalf("expected second chunk with two files, got %d", len(chunks[1]))
+	}
+}
+
+func TestChunkPathsRebalancesMultipleTails(t *testing.T) {
+	t.Parallel()
+
+	chunks := chunkPaths([]string{
+		"a.go", "b.go", "c.go", "d.go", "e.go", "f.go", "g.go", "h.go", "i.go",
+	}, 4)
+
+	if len(chunks) != 3 {
+		t.Fatalf("expected three chunks, got %d", len(chunks))
+	}
+	expected := []int{4, 3, 2}
+	for index, chunk := range chunks {
+		if len(chunk) != expected[index] {
+			t.Fatalf("expected chunk %d with %d files, got %d", index, expected[index], len(chunk))
+		}
 	}
 }
 
@@ -237,5 +273,43 @@ func TestCommitServicePlanCommitsGroupsCrossCuttingRefactorByTopic(t *testing.T)
 	}
 	if len(review.Plans[0].Result.Paths) != 2 {
 		t.Fatalf("expected cross-cutting plan with two files, got %d", len(review.Plans[0].Result.Paths))
+	}
+}
+
+func TestCommitServicePlanCommitsSeparatesDependencyFilesFromCode(t *testing.T) {
+	t.Parallel()
+
+	service := NewCommitService(&mocks.GitRepository{
+		GetDiffFunc: func(paths ...string) (string, error) {
+			lines := []string{}
+			for _, path := range paths {
+				lines = append(lines, "diff --git a/"+path+" b/"+path, "index 1111111..2222222 100644")
+			}
+			return strings.Join(lines, "\n"), nil
+		},
+	}, &mocks.AIProvider{})
+
+	review, err := service.PlanCommits([]string{
+		"internal/cli/commit.go",
+		"internal/cli/review.go",
+		"internal/app/commit_service.go",
+		"internal/domain/commit/analyzer.go",
+		"go.mod",
+		"go.sum",
+	})
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if len(review.Plans) != 2 {
+		t.Fatalf("expected two plans, got %d", len(review.Plans))
+	}
+	if len(review.Plans[0].Result.Paths) != 2 {
+		t.Fatalf("expected dependency plan with two files, got %d", len(review.Plans[0].Result.Paths))
+	}
+	if review.Plans[0].Result.Paths[0] != "go.mod" || review.Plans[0].Result.Paths[1] != "go.sum" {
+		t.Fatalf("expected dependency files in first plan, got %#v", review.Plans[0].Result.Paths)
+	}
+	if len(review.Plans[1].Result.Paths) != 4 {
+		t.Fatalf("expected code plan with four files, got %d", len(review.Plans[1].Result.Paths))
 	}
 }

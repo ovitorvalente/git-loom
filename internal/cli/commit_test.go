@@ -97,7 +97,7 @@ func TestCommitCommandStagesChangedFilesWhenConfirmed(t *testing.T) {
 	}
 }
 
-func TestCommitCommandSplitsCommitsInBlocksOfFour(t *testing.T) {
+func TestCommitCommandSplitsCommitsInBalancedBlocks(t *testing.T) {
 	t.Parallel()
 
 	output := &bytes.Buffer{}
@@ -139,11 +139,11 @@ func TestCommitCommandSplitsCommitsInBlocksOfFour(t *testing.T) {
 	if len(gitRepository.CommitPathsCalls) != 2 {
 		t.Fatalf("expected two commit blocks, got %d", len(gitRepository.CommitPathsCalls))
 	}
-	if len(gitRepository.CommitPathsCalls[0].Paths) != 4 {
-		t.Fatalf("expected first block with four files, got %d", len(gitRepository.CommitPathsCalls[0].Paths))
+	if len(gitRepository.CommitPathsCalls[0].Paths) != 3 {
+		t.Fatalf("expected first block with three files, got %d", len(gitRepository.CommitPathsCalls[0].Paths))
 	}
-	if len(gitRepository.CommitPathsCalls[1].Paths) != 1 {
-		t.Fatalf("expected second block with one file, got %d", len(gitRepository.CommitPathsCalls[1].Paths))
+	if len(gitRepository.CommitPathsCalls[1].Paths) != 2 {
+		t.Fatalf("expected second block with two files, got %d", len(gitRepository.CommitPathsCalls[1].Paths))
 	}
 	if !strings.Contains(output.String(), "☕ 2 commits criados") {
 		t.Fatalf("unexpected output: %q", output.String())

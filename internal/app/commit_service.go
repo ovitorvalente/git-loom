@@ -80,21 +80,9 @@ func (service CommitService) GenerateCommitForPaths(paths []string, options ...G
 
 func (service CommitService) PlanCommits(paths []string, options ...GenerateCommitOptions) (CommitReview, error) {
 	commitOptions := firstCommitOptions(options)
-	groupedPaths := map[string][]string{}
-
-	for _, path := range paths {
-		result, err := service.GenerateCommitForPaths([]string{path}, commitOptions)
-		if err != nil {
-			return CommitReview{}, err
-		}
-
-		context := semantic.NewCommitContext(result.Diff)
-		groupKey := buildGroupKey(string(result.Commit.Type), result.Commit.Scope, semantic.BuildGroupingKey(string(result.Commit.Type), context))
-		groupedPaths[groupKey] = append(groupedPaths[groupKey], path)
-	}
-
 	plans := []CommitPlan{}
-	for _, group := range stableGroups(groupedPaths) {
+	for _, group := range planningGroups(paths) {
+		groupPlans := []CommitPlan{}
 		for _, chunk := range chunkPaths(group, 4) {
 			result, err := service.GenerateCommitForPaths(chunk, commitOptions)
 			if err != nil {
@@ -102,7 +90,7 @@ func (service CommitService) PlanCommits(paths []string, options ...GenerateComm
 			}
 			context := semantic.NewCommitContext(result.Diff)
 			intent := semantic.DetectIntent(string(result.Commit.Type), context)
-			plans = append(plans, CommitPlan{
+			groupPlans = append(groupPlans, CommitPlan{
 				Result: CommitResult{
 					Diff:    result.Diff,
 					Message: result.Message,
@@ -115,11 +103,12 @@ func (service CommitService) PlanCommits(paths []string, options ...GenerateComm
 				SemanticGroup: semantic.BuildGroupingKey(string(result.Commit.Type), context),
 			})
 		}
-	}
 
-	plans, err := service.optimizePlans(plans, commitOptions)
-	if err != nil {
-		return CommitReview{}, err
+		optimizedGroup, err := service.optimizePlans(groupPlans, commitOptions)
+		if err != nil {
+			return CommitReview{}, err
+		}
+		plans = append(plans, optimizedGroup...)
 	}
 
 	review := CommitReview{
@@ -267,9 +256,49 @@ func stableGroups(groupedPaths map[string][]string) [][]string {
 	return result
 }
 
+func planningGroups(paths []string) [][]string {
+	dependencyPaths := []string{}
+	regularPaths := []string{}
+
+	for _, path := range paths {
+		if isDependencyPath(path) {
+			dependencyPaths = append(dependencyPaths, path)
+			continue
+		}
+
+		regularPaths = append(regularPaths, path)
+	}
+
+	sort.Strings(dependencyPaths)
+	sort.Strings(regularPaths)
+
+	groups := [][]string{}
+	if len(dependencyPaths) > 0 {
+		groups = append(groups, dependencyPaths)
+	}
+	if len(regularPaths) > 0 {
+		groups = append(groups, regularPaths)
+	}
+
+	return groups
+}
+
+func isDependencyPath(path string) bool {
+	normalized := strings.ToLower(filepath.Base(strings.TrimSpace(path)))
+	switch normalized {
+	case "go.mod", "go.sum", "package.json", "package-lock.json", "pnpm-lock.yaml", "yarn.lock", "cargo.toml", "cargo.lock", "composer.json", "composer.lock", "requirements.txt", "poetry.lock", "pyproject.toml":
+		return true
+	default:
+		return false
+	}
+}
+
 func chunkPaths(paths []string, chunkSize int) [][]string {
 	if len(paths) == 0 {
 		return nil
+	}
+	if chunkSize <= 1 {
+		return [][]string{append([]string(nil), paths...)}
 	}
 
 	chunks := [][]string{}
@@ -280,6 +309,28 @@ func chunkPaths(paths []string, chunkSize int) [][]string {
 		}
 		chunks = append(chunks, append([]string(nil), paths[start:end]...))
 	}
+
+	chunks = rebalanceSingleFileTail(chunks)
+	return chunks
+}
+
+func rebalanceSingleFileTail(chunks [][]string) [][]string {
+	if len(chunks) < 2 {
+		return chunks
+	}
+
+	lastIndex := len(chunks) - 1
+	previousIndex := lastIndex - 1
+	if len(chunks[lastIndex]) != 1 {
+		return chunks
+	}
+	if len(chunks[previousIndex]) <= 2 {
+		return chunks
+	}
+
+	moved := chunks[previousIndex][len(chunks[previousIndex])-1]
+	chunks[previousIndex] = chunks[previousIndex][:len(chunks[previousIndex])-1]
+	chunks[lastIndex] = append([]string{moved}, chunks[lastIndex]...)
 
 	return chunks
 }
