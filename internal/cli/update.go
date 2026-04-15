@@ -165,7 +165,9 @@ func performUpdate(version string) error {
 		return fmt.Errorf("falha ao baixar script: %w", err)
 	}
 
-	os.Chmod(scriptPath, 0o755)
+	if err := os.Chmod(scriptPath, 0o755); err != nil {
+		return fmt.Errorf("falha ao definir permissao: %w", err)
+	}
 
 	installCmd := exec.Command("bash", scriptPath, "-v", version, "-f")
 	installCmd.Stdout = os.Stdout
