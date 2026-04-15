@@ -216,3 +216,34 @@ func TestRendererFinalPreview(t *testing.T) {
 		t.Fatalf("expected output to contain feat(cli), got %q", output)
 	}
 }
+
+func TestRendererCommitPlanExplainMode(t *testing.T) {
+	t.Parallel()
+
+	renderer := NewRenderer(RenderOptions{ShowExplain: true})
+	plan := app.CommitPlan{
+		Result: app.CommitResult{
+			Message: "feat(cli): adicionar fluxo de commit",
+			Commit: domaincommit.Model{
+				Type:  domaincommit.TypeFeat,
+				Scope: "cli",
+			},
+			Paths: []string{"internal/cli/commit.go"},
+		},
+		Quality: semantic.CommitQuality{
+			Score: 90,
+			Criteria: []semantic.QualityCriteria{
+				{Name: "escopo", Warning: true, Message: "escopo generico: cli"},
+			},
+		},
+		SemanticGroup: "feat|cli|commit",
+	}
+
+	output := renderer.CommitPlan(1, 1, plan)
+	if !strings.Contains(output, "porque esse agrupamento:") {
+		t.Fatalf("expected explain section, got %q", output)
+	}
+	if !strings.Contains(output, "diagnostico de score:") {
+		t.Fatalf("expected score diagnostic section, got %q", output)
+	}
+}

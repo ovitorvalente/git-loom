@@ -16,6 +16,7 @@ const (
 type RenderOptions struct {
 	Mode        RenderMode
 	ShowPreview bool
+	ShowExplain bool
 }
 
 type Renderer struct {
@@ -44,6 +45,10 @@ func (renderer Renderer) mode() RenderMode {
 
 func (renderer Renderer) withPreview() bool {
 	return renderer.options.ShowPreview
+}
+
+func (renderer Renderer) withExplain() bool {
+	return renderer.options.ShowExplain
 }
 
 const (
